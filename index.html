@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador QR & Cloud</title>
+    <!-- LIBRERÍA QR OFICIAL NECESARIA -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- CONTENEDOR DE LOGIN -->
+    <div id="loginContainer" class="login-container">
+        <form id="loginForm" class="login-box">
+            <h2>Iniciar Sesión</h2>
+            <div class="input-group">
+                <label>Usuario</label>
+                <input type="text" id="userInput" required placeholder="Ingrese usuario">
+            </div>
+            <div class="input-group">
+                <label>Contraseña</label>
+                <input type="password" id="passInput" required placeholder="Ingrese contraseña">
+            </div>
+            <button type="submit" class="btn-primary">Entrar</button>
+        </form>
+    </div>
+
+    <!-- CONTENEDOR PRINCIPAL DE LA APP -->
+    <div id="appContainer" class="app-container hidden">
+        
+        <!-- MENÚ LATERAL DE HISTORIAL (ÁRBOL) -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h3>📁 Historial</h3>
+            </div>
+            <div id="treeMenu" class="tree-menu">
+                <!-- Se llena dinámicamente -->
+            </div>
+            <div class="sidebar-footer">
+                <button id="btnLogout" class="btn-danger">Cerrar Sesión</button>
+            </div>
+        </aside>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="main-content">
+            <header class="content-header">
+                <h2>Generador QR & Cloud</h2>
+                <p>Almacena datos y visualiza tus imágenes</p>
+            </header>
+
+            <form id="qrForm" class="qr-form">
+                <div class="form-group">
+                    <label for="titulo">Título del Registro</label>
+                    <input type="text" id="titulo" required placeholder="Ej: Registro #01">
+                </div>
+
+                <div class="form-group">
+                    <label for="contenido">Contenido o Enlace para el QR</label>
+                    <input type="text" id="contenido" required placeholder="Ej: https://miapp.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="imagenesInput">Seleccionar Imágenes</label>
+                    <input type="file" id="imagenesInput" accept="image/*" multiple>
+                </div>
+
+                <!-- Previsualización de imágenes seleccionadas -->
+                <div id="previewGallery" class="preview-gallery hidden">
+                    <p>Imágenes listas para adjuntar:</p>
+                    <div id="thumbnailsContainer" class="thumbnails-container"></div>
+                </div>
+
+                <button type="submit" class="btn-success">Generar QR y Guardar</button>
+            </form>
+
+            <div id="statusMsg" class="status-msg hidden"></div>
+
+            <!-- RESULTADO DEL QR GENERADO -->
+            <div id="qrResultContainer" class="qr-result-container">
+                <div id="qrcode"></div>
+                <div id="qrActions" class="qr-actions hidden">
+                    <button id="btnPrint" class="btn-secondary">🖨️ Imprimir</button>
+                    <button id="btnCopy" class="btn-secondary">📋 Copiar Código</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL VISOR DE REGISTROS E IMÁGENES -->
+    <div id="viewerModal" class="modal hidden">
+        <div class="modal-content">
+            <span id="btnCloseViewer" class="close-btn">&times;</span>
+            <h2 id="viewerTitle">Título del Registro</h2>
+            <p><strong>Contenido:</strong> <span id="viewerContent"></span></p>
+            <h3>Imágenes Adjuntas:</h3>
+            <div id="viewerImages" class="viewer-images-container">
+                <!-- Las imágenes se cargan aquí -->
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT PRINCIPAL -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>
