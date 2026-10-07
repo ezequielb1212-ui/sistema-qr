@@ -2,107 +2,112 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Gestión QR</title>
-    <link rel="stylesheet" href="style.css">
-    
-    <!-- Librería oficial de Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Viewport vital para que escale bien en celulares -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistema de Gestión de Registros y QR</title>
     <!-- Librería para generar códigos QR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- CONTENEDOR DE LOGIN (Administrador) -->
+    <!-- ==========================================
+        PANTALLA DE LOGIN
+        ========================================== -->
     <div id="loginContainer" class="login-wrapper">
         <div class="login-card">
-            <h2>Acceso Administrativo</h2>
+            <h2>Acceso al Sistema QrDerivacion</h2>
             <form id="loginForm">
-                <input type="email" id="userInput" placeholder="Correo de administrador" required>
-                <input type="password" id="passInput" placeholder="Contraseña" required>
+                <div class="input-group">
+                    <label for="userInput">Correo electrónico</label>
+                    <input type="email" id="userInput" required placeholder="admin@sistema.com">
+                </div>
+                <div class="input-group">
+                    <label for="passInput">Contraseña</label>
+                    <input type="password" id="passInput" required placeholder="••••••••••••">
+                </div>
                 <button type="submit" class="btn-primary">Ingresar</button>
             </form>
         </div>
     </div>
 
-    <!-- CONTENEDOR PRINCIPAL DE LA APLICACIÓN -->
-    <div id="appContainer" class="app-wrapper hidden">
+    <!-- ==========================================
+        APLICACIÓN PRINCIPAL (PANEL ADMIN Y FORMULARIO)
+        ========================================== -->
+    <div id="appContainer" class="app-layout hidden">
         
-        <!-- BARRA LATERAL (Historial por Fechas y Logout) -->
+        <!-- Sidebar / Historial Lateral Retráctil -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h3>📁 Historial de QR</h3>
-                <button id="btnLogout" class="btn-logout">Cerrar Sesión</button>
+                <h3>Historial</h3>
+                <button id="btnLogout" class="btn-logout">Salir</button>
             </div>
             <div id="treeMenu" class="tree-menu">
                 <!-- Se llena dinámicamente -->
             </div>
         </aside>
 
-        <!-- CONTENIDO CENTRAL (Formulario y Generador) -->
+        <!-- Contenido Principal -->
         <main class="main-content">
-            <header class="main-header">
-                <h1>Generador y Gestor de Códigos QR</h1>
-            </header>
-
-            <section class="form-section">
+            <div class="form-card">
+                <h2>Nuevo Registro y Código QR</h2>
+                
                 <form id="qrForm">
                     <div class="input-group">
-                        <label for="titulo">Título del Registro:</label>
-                        <input type="text" id="titulo" placeholder="Ej: Control de Mantenimiento #1" required>
+                        <label for="titulo">Nombre y Apellido del Paciente</label>
+                        <input type="text" id="titulo" required placeholder="Ej: Mantenimiento Unidad 03">
                     </div>
 
                     <div class="input-group">
-                        <label for="contenido">Descripción / Información:</label>
-                        <textarea id="contenido" rows="3" placeholder="Detalles visibles al escanear el QR..." required></textarea>
+                        <label for="contenido">Obra Social</label>
+                        <textarea id="contenido" required placeholder="Detalles de la información..."></textarea>
                     </div>
 
                     <div class="input-group">
-                        <label for="imagenesInput">Adjuntar Imágenes:</label>
-                        <input type="file" id="imagenesInput" accept="image/*" multiple>
+                        <label class="file-label" for="imagenesInput">📁 Seleccionar Imágenes</label>
+                        <input type="file" id="imagenesInput" accept="image/*" multiple style="display: none;">
                     </div>
 
-                    <!-- Galería de previsualización de imágenes comprimidas -->
-                    <div id="previewGallery" class="preview-gallery hidden">
-                        <p>Imágenes preparadas:</p>
-                        <div id="thumbnailsContainer"></div>
+                    <div id="previewGallery" class="hidden">
+                        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Imágenes seleccionadas:</label>
+                        <div class="thumbnails-container" id="thumbnailsContainer"></div>
                     </div>
 
-                    <button type="submit" class="btn-success">Guardar y Generar QR</button>
+                    <button type="submit" class="btn-primary" style="margin-top: 20px;">Guardar y Generar QR</button>
                 </form>
 
-                <p id="statusMsg" class="status-msg hidden"></p>
-            </section>
+                <div id="statusMsg" class="hidden" style="margin-top: 15px; font-weight: 600; text-align: center;"></div>
 
-            <!-- SECCIÓN DEL CÓDIGO QR GENERADO -->
-            <section class="qr-output-section">
-                <div id="qrcode"></div>
-                <div id="qrActions" class="qr-actions hidden">
-                    <button id="btnPrint" class="btn-secondary">🖨️ Imprimir QR</button>
-                    <button id="btnCopy" class="btn-secondary">📋 Copiar Enlace</button>
+                <!-- Sección de resultado del QR -->
+                <div id="qrActions" class="qr-result-section hidden">
+                    <div id="qrcode"></div>
+                    <div class="action-buttons">
+                        <button id="btnPrint" class="btn-secondary">🖨️ Imprimir</button>
+                        <button id="btnCopy" class="btn-secondary">📋 Copiar Enlace</button>
+                    </div>
                 </div>
-            </section>
+            </div>
         </main>
     </div>
 
-    <!-- MODAL VISOR PÚBLICO (Se abre al escanear el QR o hacer clic en el historial) -->
+    <!-- ==========================================
+        VISOR DE IMÁGENES / MODAL (CARRUSEL 1 X 1)
+        ========================================== -->
     <div id="viewerModal" class="modal hidden">
         <div class="modal-content">
-            <button id="btnCloseViewer" class="btn-close">×</button>
-            <h2 id="viewerTitle">Título del Registro</h2>
-            <p id="viewerContent">Información detallada...</p>
-            <div id="viewerImages" class="viewer-images-grid">
-                <!-- Imágenes adjuntas -->
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <h3 id="viewerTitle">Título</h3>
+                    <p id="viewerContent" style="color: #94a3b8; font-size: 0.8rem; margin-top: 2px;"></p>
+                </div>
+                <button id="btnCloseViewer" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body" id="viewerImages">
+                <!-- Carrusel inyectado por JS -->
             </div>
         </div>
     </div>
 
-    <script type="module" src="app.js"></script>
-</body>
-</html>
-    </div>
-
-    <!-- SCRIPT PRINCIPAL -->
     <script type="module" src="app.js"></script>
 </body>
 </html>
