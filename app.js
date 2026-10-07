@@ -4,9 +4,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 // CONFIGURACIÓN DE SUPABASE (Tabla: foto_qr_lr)
 // ==========================================
 const SUPABASE_URL = 'https://xdbquvontcxjymxharmr.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYnF1dm9udGN4anlteGhhcm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNzYwNjMsImV4cCI6MjEwNjk1MjA2M30.YSQmfv6LFulZa9RIP7VnfL4UZXYobhsEUKOKGOI9Ilk';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYnF1dm9udCXjymxhcm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNzYwNjMsImV4cCI6MjEwNjk1MjA2M30.YSQmfv6LFulZa9RIP7VnfL4UZXYobhsEUKOKGOI9Ilk';
 
-// Inicialización limpia con persistencia desactivada
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
         persistSession: false,
@@ -14,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     }
 });
 
-// Credenciales fijas de Administrador para el frontend
+// Credenciales fijas de Administrador
 const ADMIN_USER = "admin@sistema.com";
 const ADMIN_PASS = "tuContraseñaSegura123";
 
@@ -47,12 +46,16 @@ const viewerImages = document.getElementById('viewerImages');
 let selectedImagesBase64 = [];
 let ultimoContenidoQR = "";
 
+// Variables para el control del Lightbox de imágenes
+let currentImagesArray = [];
+let currentLightboxIndex = 0;
+
 // 1. CARGA INICIAL
 window.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const recordId = urlParams.get('id');
 
-    // MODO PÚBLICO: Si se escaneó un QR (?id=...)
+    // MODO PÚBLICO: Si se escaneó un QR (?id=...) -> Mostrar SOLO imágenes en visor limpio
     if (recordId) {
         try {
             const { data, error } = await supabase
@@ -65,7 +68,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 loginContainer.classList.add('hidden');
                 appContainer.classList.remove('hidden');
                 document.querySelector('.sidebar').classList.add('hidden');
-                abrirModalVisor(data);
+                abrirVisorPublicoSoloImagenes(data);
             } else {
                 alert("El registro escaneado no existe o fue eliminado.");
             }
@@ -75,7 +78,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // MODO ADMINISTRADOR: Por defecto SIEMPRE mostramos el login al entrar a la raíz
+    // MODO ADMINISTRADOR: Mostrar login
     localStorage.removeItem('adminLogueado');
     appContainer.classList.add('hidden');
     loginContainer.classList.remove('hidden');
@@ -100,7 +103,6 @@ if (loginForm) {
     });
 }
 
-// CERRAR SESIÓN
 if (btnLogout) {
     btnLogout.addEventListener('click', () => {
         localStorage.removeItem('adminLogueado');
@@ -108,8 +110,8 @@ if (btnLogout) {
     });
 }
 
-// 3. COMPRESIÓN DE IMÁGENES
-function comprimirImagen(file, maxWidth = 800, quality = 0.7) {
+// 3. COMPRESIÓN DE IMÁGENES (Alta calidad para nitidez máxima)
+function comprimirImagen(file, maxWidth = 1200, quality = 0.85) {
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -138,7 +140,6 @@ function comprimirImagen(file, maxWidth = 800, quality = 0.7) {
     });
 }
 
-// PREVISUALIZAR IMÁGENES
 if (imagenesInput) {
     imagenesInput.addEventListener('change', async (e) => {
         const files = e.target.files;
@@ -309,23 +310,126 @@ async function cargarHistorialPorFechas() {
     }
 }
 
-// 6. VISOR DE REGISTROS (MODAL)
+// 6. VISTA PÚBLICA (SOLO IMÁGENES AL ESCANEAR EL QR)
+function abrirVisorPublicoSoloImagenes(reg) {
+    viewerTitle.style.display = 'none';
+    viewerContent.style.display = 'none';
+    viewerImages.innerHTML = '';
+
+    if (reg.imagenes && reg.imagenes.length > 0) {
+        currentImagesArray = reg.imagenes;
+        const gridWrapper = document.createElement('div');
+        gridWrapper.classList.add('public-gallery-container');
+
+        const grid = document.createElement('div');
+        grid.classList.add('public-gallery-grid');
+
+        reg.imagenes.forEach((imgBase64, index) => {
+            const img = document.createElement('img');
+            img.src = imgBase64;
+            img.addEventListener('click', () => abrirLightbox(index));
+            grid.appendChild(img);
+        });
+
+        gridWrapper.appendChild(grid);
+        viewerImages.appendChild(gridWrapper);
+    } else {
+        viewerImages.innerHTML = '<p style="text-align:center; padding: 40px; color: #64748b;">No hay imágenes disponibles en este registro.</p>';
+    }
+
+    viewerModal.classList.remove('hidden');
+}
+
+// VISOR NORMAL PARA ADMINISTRADOR (Muestra título, contenido y fotos)
 function abrirModalVisor(reg) {
+    viewerTitle.style.display = 'block';
+    viewerContent.style.display = 'block';
     viewerTitle.textContent = reg.titulo;
     viewerContent.textContent = reg.contenido;
     viewerImages.innerHTML = '';
 
     if (reg.imagenes && reg.imagenes.length > 0) {
-        reg.imagenes.forEach(imgBase64 => {
+        currentImagesArray = reg.imagenes;
+        const grid = document.createElement('div');
+        grid.classList.add('viewer-images-grid');
+
+        reg.imagenes.forEach((imgBase64, index) => {
             const img = document.createElement('img');
             img.src = imgBase64;
-            viewerImages.appendChild(img);
+            img.addEventListener('click', () => abrirLightbox(index));
+            grid.appendChild(img);
         });
+        viewerImages.appendChild(grid);
     } else {
         viewerImages.innerHTML = '<p>No hay imágenes adjuntas en este registro.</p>';
     }
 
     viewerModal.classList.remove('hidden');
+}
+
+// 7. LIGHTBOX (VISOR DE IMAGEN 1 X 1 CON FLECHAS LATERALES)
+function abrirLightbox(index) {
+    currentLightboxIndex = index;
+
+    // Crear elemento lightbox si no existe
+    let lightbox = document.getElementById('customLightbox');
+    if (!lightbox) {
+        lightbox = document.createElement('div');
+        lightbox.id = 'customLightbox';
+        lightbox.classList.add('lightbox-modal');
+        document.body.appendChild(lightbox);
+    }
+
+    renderLightboxContent(lightbox);
+}
+
+function renderLightboxContent(lightbox) {
+    lightbox.innerHTML = `
+        <div class="lightbox-content">
+            <button class="lightbox-close" id="lbClose">&times;</button>
+            <button class="lightbox-btn lightbox-prev" id="lbPrev">&#10094;</button>
+            <img src="${currentImagesArray[currentLightboxIndex]}" alt="Imagen ampliada" id="lbImg">
+            <button class="lightbox-btn lightbox-next" id="lbNext">&#10095;</button>
+        </div>
+    `;
+
+    // Eventos de botones
+    document.getElementById('lbClose').addEventListener('click', cerrarLightbox);
+    document.getElementById('lbPrev').addEventListener('click', (e) => {
+        e.stopPropagation();
+        cambiarImagenLightbox(-1);
+    });
+    document.getElementById('lbNext').addEventListener('click', (e) => {
+        e.stopPropagation();
+        cambiarImagenLightbox(1);
+    });
+
+    // Cerrar haciendo clic fuera de la imagen
+    lightbox.addEventListener('click', (e) => {
+        if (e.target.id === 'customLightbox' || e.target.classList.contains('lightbox-content')) {
+            cerrarLightbox();
+        }
+    });
+}
+
+function cambiarImagenLightbox(direccion) {
+    currentLightboxIndex += direccion;
+    if (currentLightboxIndex < 0) {
+        currentLightboxIndex = currentImagesArray.length - 1; // Volver al final
+    } else if (currentLightboxIndex >= currentImagesArray.length) {
+        currentLightboxIndex = 0; // Volver al inicio
+    }
+    const lbImg = document.getElementById('lbImg');
+    if (lbImg) {
+        lbImg.src = currentImagesArray[currentLightboxIndex];
+    }
+}
+
+function cerrarLightbox() {
+    const lightbox = document.getElementById('customLightbox');
+    if (lightbox) {
+        lightbox.remove();
+    }
 }
 
 if (btnCloseViewer) {
