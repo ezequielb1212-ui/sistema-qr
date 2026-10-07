@@ -1,21 +1,27 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-// Configuración de Firebase (asegúrate de mantener tus credenciales o las de tu proyecto)
-const firebaseConfig = {
-    apiKey: "AIzaSyB...", 
-    authDomain: "generadorqr-app.firebaseapp.com",
-    projectId: "generadorqr-app",
-    storageBucket: "generadorqr-app.appspot.com",
-    messagingSenderId: "331826500000",
-    appId: "1:331826500000:web:..."
-};
+// ==========================================
+// CONFIGURACIÓN DE SUPABASE (Tabla: foto_qr_lr)
+// ==========================================
+const SUPABASE_URL = 'https://xdbquvontcxjymxharmr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYnF1dm9udGN4anlteGhhcm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNzYwNjMsImV4cCI6MjEwNjk1MjA2M30.YSQmfv6LFulZa9RIP7VnfL4UZXYobhsEUKOKGOI9Ilk';
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Inicialización limpia con persistencia desactivada
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+        persistSession: false,
+        autoRefreshToken: false
+    }
+});
+
+// Credenciales fijas de Administrador para el frontend
+const ADMIN_USER = "admin@sistema.com";
+const ADMIN_PASS = "tuContraseñaSegura123";
 
 // Referencias del DOM
 const loginForm = document.getElementById('loginForm');
+const userInput = document.getElementById('userInput');
+const passInput = document.getElementById('passInput');
 const loginContainer = document.getElementById('loginContainer');
 const appContainer = document.getElementById('appContainer');
 const btnLogout = document.getElementById('btnLogout');
@@ -41,49 +47,68 @@ const viewerImages = document.getElementById('viewerImages');
 let selectedImagesBase64 = [];
 let ultimoContenidoQR = "";
 
-// 1. DETECTAR SI LA PÁGINA SE ABRIó DESDE UN QR ESCANEADO (con ?id=...)
+// 1. CARGA INICIAL
 window.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const recordId = urlParams.get('id');
 
+    // MODO PÚBLICO: Si se escaneó un QR (?id=...)
     if (recordId) {
         try {
-            const docSnap = await getDoc(doc(db, "codigosQR", recordId));
+            const { data, error } = await supabase
+                .from('foto_qr_lr')
+                .select('*')
+                .eq('id', recordId)
+                .single();
 
-            if (docSnap.exists()) {
-                const reg = { id: docSnap.id, ...docSnap.data() };
-                // Ocultar login/app normal y mostrar directo el visor con sus imágenes
+            if (data) {
                 loginContainer.classList.add('hidden');
                 appContainer.classList.remove('hidden');
-                abrirModalVisor(reg);
+                document.querySelector('.sidebar').classList.add('hidden');
+                abrirModalVisor(data);
             } else {
                 alert("El registro escaneado no existe o fue eliminado.");
             }
-        } catch (error) {
-            console.error("Error al cargar el registro desde el QR:", error);
+        } catch (err) {
+            console.error("Error al cargar el registro:", err);
         }
+        return;
     }
+
+    // MODO ADMINISTRADOR: Por defecto SIEMPRE mostramos el login al entrar a la raíz
+    localStorage.removeItem('adminLogueado');
+    appContainer.classList.add('hidden');
+    loginContainer.classList.remove('hidden');
 });
 
-// CONTROL DE LOGIN
+// 2. CONTROL DE LOGIN
 if (loginForm) {
     loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        loginContainer.classList.add('hidden');
-        appContainer.classList.remove('hidden');
-        cargarHistorialPorFechas();
+        const email = userInput.value.trim();
+        const password = passInput.value.trim();
+
+        if (email === ADMIN_USER && password === ADMIN_PASS) {
+            localStorage.setItem('adminLogueado', 'true');
+            loginContainer.classList.add('hidden');
+            appContainer.classList.remove('hidden');
+            cargarHistorialPorFechas();
+            loginForm.reset();
+        } else {
+            alert("Usuario o contraseña incorrectos.");
+        }
     });
 }
 
+// CERRAR SESIÓN
 if (btnLogout) {
     btnLogout.addEventListener('click', () => {
-        appContainer.classList.add('hidden');
-        loginContainer.classList.remove('hidden');
-        loginForm.reset();
+        localStorage.removeItem('adminLogueado');
+        window.location.href = window.location.pathname;
     });
 }
 
-// FUNCIÓN PARA COMPRIMIR IMÁGENES (Evita saturar la base de datos)
+// 3. COMPRESIÓN DE IMÁGENES
 function comprimirImagen(file, maxWidth = 800, quality = 0.7) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -113,7 +138,7 @@ function comprimirImagen(file, maxWidth = 800, quality = 0.7) {
     });
 }
 
-// SELECCIÓN Y PREVISUALIZACIÓN DE IMÁGENES
+// PREVISUALIZAR IMÁGENES
 if (imagenesInput) {
     imagenesInput.addEventListener('change', async (e) => {
         const files = e.target.files;
@@ -136,14 +161,14 @@ if (imagenesInput) {
     });
 }
 
-// GENERAR QR Y GUARDAR EN FIRESTORE (CREANDO ENLACE DE ACCESO PARA LAS IMÁGENES)
+// 4. GUARDAR EN SUPABASE Y GENERAR QR
 if (qrForm) {
     qrForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const titulo = document.getElementById('titulo').value.trim();
         const contenido = document.getElementById('contenido').value.trim();
 
-        statusMsg.textContent = "Guardando registro y generando QR...";
+        statusMsg.textContent = "Guardando en Supabase y generando QR...";
         statusMsg.classList.remove('hidden');
 
         try {
@@ -151,24 +176,28 @@ if (qrForm) {
             const year = fechaActual.getFullYear().toString();
             const month = (fechaActual.getMonth() + 1).toString().padStart(2, '0');
 
-            // 1. Guardar en Firestore con las imágenes adjuntas
-            const docRef = await addDoc(collection(db, "codigosQR"), {
-                titulo,
-                contenido,
-                imagenes: selectedImagesBase64,
-                year,
-                month,
-                fechaCreacion: fechaActual.toISOString()
-            });
+            const { data, error } = await supabase
+                .from('foto_qr_lr')
+                .insert([
+                    {
+                        titulo,
+                        contenido,
+                        imagenes: selectedImagesBase64,
+                        year,
+                        month
+                    }
+                ])
+                .select();
 
-            // 2. Crear URL única apuntando a este registro para que el QR abra las imágenes
+            if (error) throw error;
+
+            const nuevoRegistroId = data[0].id;
             const baseUrl = window.location.origin + window.location.pathname;
-            const enlaceQRConDatos = `${baseUrl}?id=${docRef.id}`;
+            const enlaceQRConDatos = `${baseUrl}?id=${nuevoRegistroId}`;
             ultimoContenidoQR = enlaceQRConDatos;
 
             statusMsg.textContent = "¡Guardado y QR Generado con éxito!";
             
-            // 3. Dibujar QR visual en pantalla
             qrcodeContainer.innerHTML = "";
             if (typeof QRCode !== 'undefined') {
                 new QRCode(qrcodeContainer, {
@@ -176,13 +205,9 @@ if (qrForm) {
                     width: 140,
                     height: 140
                 });
-            } else {
-                qrcodeContainer.innerHTML = `<div style="padding:10px; font-size:0.85rem; word-break:break-all; background:#f8d7da; color:#721c24; border-radius:4px;"><strong>Enlace QR:</strong><br>${enlaceQRConDatos}</div>`;
             }
             
             qrActions.classList.remove('hidden');
-
-            // 4. Limpiar formulario y refrescar historial
             qrForm.reset();
             previewGallery.classList.add('hidden');
             selectedImagesBase64 = [];
@@ -190,57 +215,53 @@ if (qrForm) {
             await cargarHistorialPorFechas();
 
         } catch (error) {
-            console.error("Error detallado:", error);
+            console.error("Error al guardar:", error);
             statusMsg.textContent = "Error al procesar: " + error.message;
         }
     });
 }
 
-// BOTÓN IMPRIMIR QR
 if (btnPrint) {
-    btnPrint.addEventListener('click', () => {
-        window.print();
-    });
+    btnPrint.addEventListener('click', () => { window.print(); });
 }
 
-// BOTÓN COPIAR ENLACE AL PORTAPAPELES
 if (btnCopy) {
     btnCopy.addEventListener('click', () => {
         if (ultimoContenidoQR) {
             navigator.clipboard.writeText(ultimoContenidoQR).then(() => {
-                alert("¡Enlace del QR copiado al portapapeles!");
-            }).catch(err => {
-                console.error("Error al copiar: ", err);
+                alert("¡Enlace copiado al portapapeles!");
             });
-        } else {
-            alert("No hay contenido para copiar.");
         }
     });
 }
 
-// CARGAR HISTORIAL EN EL MENÚ LATERAL
+// 5. CARGAR HISTORIAL EN EL MENÚ LATERAL
 async function cargarHistorialPorFechas() {
     try {
-        const querySnapshot = await getDocs(collection(db, "codigosQR"));
+        const { data, error } = await supabase
+            .from('foto_qr_lr')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
         treeMenu.innerHTML = '';
 
-        if (querySnapshot.empty) {
+        if (!data || data.length === 0) {
             treeMenu.innerHTML = '<p class="empty-text">No hay registros guardados.</p>';
             return;
         }
 
         const estructura = {};
 
-        querySnapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            const registro = { id: docSnap.id, ...data };
-            const year = data.year || '2026';
-            const month = data.month || '10';
+        data.forEach(reg => {
+            const year = reg.year || '2026';
+            const month = reg.month || '10';
 
             if (!estructura[year]) estructura[year] = {};
             if (!estructura[year][month]) estructura[year][month] = [];
 
-            estructura[year][month].push(registro);
+            estructura[year][month].push(reg);
         });
 
         for (const year in estructura) {
@@ -285,11 +306,10 @@ async function cargarHistorialPorFechas() {
 
     } catch (error) {
         console.error("Error cargando historial:", error);
-        treeMenu.innerHTML = '<p class="empty-text">Error al cargar historial.</p>';
     }
 }
 
-// ABRIR MODAL VISOR CON SUS RESPECTIVAS IMÁGENES
+// 6. VISOR DE REGISTROS (MODAL)
 function abrirModalVisor(reg) {
     viewerTitle.textContent = reg.titulo;
     viewerContent.textContent = reg.contenido;
@@ -311,7 +331,6 @@ function abrirModalVisor(reg) {
 if (btnCloseViewer) {
     btnCloseViewer.addEventListener('click', () => {
         viewerModal.classList.add('hidden');
-        // Limpiar parámetros de la URL al cerrar el visor opcionalmente
         window.history.replaceState({}, document.title, window.location.pathname);
     });
 }
