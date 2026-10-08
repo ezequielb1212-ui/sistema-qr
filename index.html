@@ -2,7 +2,6 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- Viewport vital para que escale bien en celulares -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sistema de Gestión de Registros y QR</title>
     <!-- Librería para generar códigos QR -->
@@ -16,7 +15,10 @@
         ========================================== -->
     <div id="loginContainer" class="login-wrapper">
         <div class="login-card">
-            <h2>Acceso al Sistema QrDerivacion</h2>
+            <!-- Logo opcional arriba del título -->
+            <img src="imagenes22/movil 8 .png" alt="Logo del Sistema" class="login-logo">
+            
+            <h2>Acceso al Sistema Qr Derivacion</h2>
             <form id="loginForm">
                 <div class="input-group">
                     <label for="userInput">Correo electrónico</label>
@@ -54,12 +56,12 @@
                 
                 <form id="qrForm">
                     <div class="input-group">
-                        <label for="titulo">Nombre y Apellido del Paciente</label>
+                        <label for="titulo">Nombre y Apellido Paciente</label>
                         <input type="text" id="titulo" required placeholder="Ej: Mantenimiento Unidad 03">
                     </div>
 
                     <div class="input-group">
-                        <label for="contenido">Obra Social</label>
+                        <label for="contenido">Obra Social </label>
                         <textarea id="contenido" required placeholder="Detalles de la información..."></textarea>
                     </div>
 
