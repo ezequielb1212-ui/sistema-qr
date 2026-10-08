@@ -3,7 +3,7 @@
     ========================================== */
 :root {
     --primary: #2563eb;
-    --primary-hover: #1d4ed8;
+    --primary-hover: #d81d2d;
     --bg-color: #f1f5f9;
     --card-bg: #ffffff;
     --text-main: #1e293b;
@@ -34,31 +34,45 @@ body {
 }
 
 /* ==========================================
-    LOGIN
+    LOGIN CON IMAGEN DE FONDO AUTOMÁTICA
     ========================================== */
 .login-wrapper {
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
     padding: 15px;
+    /* Imagen de fondo profesional automática con un filtro azulado encima */
+    background: linear-gradient(rgba(15, 23, 42, 0.75), rgba(37, 99, 235, 0.75)), url('imagenes22/central\ de\ operaciones.jpeg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
 .login-card {
-    background: var(--card-bg);
+    background: rgba(255, 255, 255, 0.95);
     padding: 30px 25px;
     border-radius: var(--radius);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.4);
     width: 100%;
     max-width: 380px;
     text-align: center;
+    backdrop-filter: blur(5px);
+}
+
+.login-logo {
+    width: 200px;
+    height: 200px;
+    object-fit: contain;
+    margin: 0 auto 15px auto;
+    display: block;
+    border-radius: 50%;
 }
 
 .login-card h2 {
     margin-bottom: 20px;
     color: var(--text-main);
-    font-size: 1.4rem;
+    font-size: 1.3rem;
 }
 
 .input-group {
@@ -79,7 +93,7 @@ body {
     padding: 10px 12px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    font-size: 1rem; /* Mínimo 16px evita zoom automático en iPhone */
+    font-size: 1rem;
     outline: none;
 }
 
@@ -113,7 +127,6 @@ body {
     position: relative;
 }
 
-/* Botón flotante de historial */
 .btn-toggle-sidebar {
     position: fixed;
     top: 12px;
@@ -135,7 +148,6 @@ body {
     background: var(--primary-hover);
 }
 
-/* Sidebar lateral */
 .sidebar {
     width: 270px;
     background: var(--card-bg);
@@ -213,7 +225,6 @@ body {
     color: var(--primary);
 }
 
-/* Contenido Principal */
 .main-content {
     flex: 1;
     padding: 25px 20px;
@@ -327,7 +338,7 @@ textarea:focus {
 }
 
 /* ==========================================
-    MODAL Y CARRUSEL ADAPTABLE (MÓVILES Y PCS)
+    MODAL Y CARRUSEL
     ========================================== */
 .modal {
     position: fixed;
@@ -463,7 +474,6 @@ textarea:focus {
     font-size: 0.75rem;
 }
 
-/* Botón de descarga adaptado para celulares */
 .carousel-download-btn {
     position: absolute;
     top: 10px;
@@ -480,14 +490,6 @@ textarea:focus {
     display: flex;
     align-items: center;
     gap: 4px;
-}
-
-/* ==========================================
-    MEDIA QUERIES PARA DISPOSITIVOS MÓVILES (≤ 768px)
-    ========================================== */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 768px) {
@@ -517,4 +519,35 @@ textarea:focus {
         height: 90vh;
         max-width: 100%;
     }
+    /* ==========================================
+    CONFIGURACIÓN DE IMPRESIÓN (SOLO QR)
+    ========================================== */
+@media print {
+    /* Ocultamos absolutamente todo el cuerpo de la página por defecto */
+    body * {
+        visibility: hidden;
+    }
+
+    /* Hacemos visible únicamente la sección del QR y su contenedor */
+    #qrActions, #qrActions * {
+        visibility: visible;
+    }
+
+    /* Posicionamos el QR arriba a la izquierda en la hoja de impresión */
+    #qrActions {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: auto;
+        background: white !important;
+        border: none !important;
+        box-shadow: none !important;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+}
 }
