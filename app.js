@@ -8,7 +8,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 const ADMIN_USER = "admin@sistema.com";
-const ADMIN_PASS = "derivacionlarioja123";
+const ADMIN_PASS = "derivaciones2026";
 
 const loginForm = document.getElementById('loginForm');
 const userInput = document.getElementById('userInput');
@@ -40,7 +40,6 @@ let ultimoContenidoQR = "";
 let currentImagesArray = [];
 let currentIndex = 0;
 
-// Botón flotante para colapsar/expandir el historial
 const btnToggleSidebar = document.createElement('button');
 btnToggleSidebar.id = "btnToggleSidebar";
 btnToggleSidebar.className = "btn-toggle-sidebar";
@@ -55,7 +54,6 @@ btnToggleSidebar.addEventListener('click', () => {
     mainContent.classList.toggle('expanded');
 });
 
-// CARGA INICIAL
 window.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const recordId = urlParams.get('id');
@@ -90,7 +88,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (btnToggleSidebar) btnToggleSidebar.classList.add('hidden');
 });
 
-// LOGIN
 if (loginForm) {
     loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -100,7 +97,6 @@ if (loginForm) {
             appContainer.classList.remove('hidden');
             btnToggleSidebar.classList.remove('hidden');
             
-            // En celulares iniciamos con el sidebar colapsado para que no tape la pantalla
             if (window.innerWidth <= 768) {
                 sidebar.classList.add('collapsed');
                 mainContent.classList.add('expanded');
@@ -121,7 +117,6 @@ if (btnLogout) {
     });
 }
 
-// COMPRESIÓN DE IMÁGENES (Alta resolución y nitidez)
 function comprimirImagen(file, maxWidth = 1600, quality = 0.92) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -167,7 +162,6 @@ if (imagenesInput) {
     });
 }
 
-// GUARDAR Y GENERAR QR
 if (qrForm) {
     qrForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -212,7 +206,6 @@ if (btnCopy) btnCopy.addEventListener('click', () => {
     if (ultimoContenidoQR) navigator.clipboard.writeText(ultimoContenidoQR).then(() => alert("¡Enlace copiado!"));
 });
 
-// HISTORIAL
 async function cargarHistorialPorFechas() {
     try {
         const { data } = await supabase.from('foto_qr_lr').select('*').order('created_at', { ascending: false });
@@ -250,7 +243,6 @@ async function cargarHistorialPorFechas() {
                     item.textContent = reg.titulo;
                     item.addEventListener('click', () => {
                         abrirVisorCarrusel(reg);
-                        // En celulares, ocultar sidebar al abrir un registro para ver mejor
                         if (window.innerWidth <= 768) {
                             sidebar.classList.add('collapsed');
                             mainContent.classList.add('expanded');
@@ -269,7 +261,6 @@ async function cargarHistorialPorFechas() {
     }
 }
 
-// VISOR DE CARRUSEL (1 FOTO A LA VEZ + BOTÓN DE DESCARGA)
 function abrirVisorCarrusel(reg) {
     if (viewerTitle) viewerTitle.textContent = reg.titulo;
     if (viewerContent) viewerContent.textContent = reg.contenido || "";
@@ -293,7 +284,6 @@ function abrirVisorCarrusel(reg) {
         counter.textContent = `1 / ${currentImagesArray.length}`;
         carContainer.appendChild(counter);
 
-        // Botón de Descarga individual
         const btnDownload = document.createElement('a');
         btnDownload.id = "carouselDownloadBtn";
         btnDownload.classList.add('carousel-download-btn');
