@@ -66,8 +66,11 @@
                     </div>
 
                     <div class="input-group">
-                        <label class="file-label" for="imagenesInput">📁 Seleccionar Imágenes</label>
-                        <input type="file" id="imagenesInput" accept="image/*" multiple style="display: none;">
+                        <label class="file-label" for="imagenesInput">📁 Seleccionar Imágenes y PDF</label>
+                        <input type="file" id="imagenesInput" accept="image/*,application/pdf,.pdf" multiple style="display: none;">
+                        <small style="display:block; margin-top:8px; color:var(--text-muted);">
+                            Podés seleccionar imágenes y archivos PDF. Se guardarán asociados al código QR.
+                        </small>
                     </div>
 
                     <div id="previewGallery" class="hidden">
