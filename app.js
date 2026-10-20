@@ -35,7 +35,7 @@ const viewerTitle = document.getElementById('viewerTitle');
 const viewerContent = document.getElementById('viewerContent');
 const viewerImages = document.getElementById('viewerImages');
 
-let selectedImagesBase64 = [];
+let selectedImagesBase64 = []; // Admite imágenes (data URL) y PDF (objetos con nombre y data URL)
 let ultimoContenidoQR = "";
 let currentImagesArray = [];
 let currentIndex = 0;
@@ -142,22 +142,78 @@ function comprimirImagen(file, maxWidth = 1600, quality = 0.92) {
     });
 }
 
+function leerArchivoComoDataURL(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error(`No se pudo leer el archivo ${file.name}`));
+        reader.readAsDataURL(file);
+    });
+}
+
 if (imagenesInput) {
     imagenesInput.addEventListener('change', async (e) => {
-        const files = e.target.files;
+        const files = Array.from(e.target.files || []);
         selectedImagesBase64 = [];
         thumbnailsContainer.innerHTML = '';
-        if (files.length > 0) {
-            previewGallery.classList.remove('hidden');
-            for (let file of files) {
-                const compressedBase64 = await comprimirImagen(file);
-                selectedImagesBase64.push(compressedBase64);
-                const img = document.createElement('img');
-                img.src = compressedBase64;
-                thumbnailsContainer.appendChild(img);
-            }
-        } else {
+
+        if (!files.length) {
             previewGallery.classList.add('hidden');
+            return;
+        }
+
+        previewGallery.classList.remove('hidden');
+
+        try {
+            for (const file of files) {
+                if (file.type.startsWith('image/')) {
+                    const compressedBase64 = await comprimirImagen(file);
+                    selectedImagesBase64.push({
+                        tipo: 'imagen',
+                        nombre: file.name,
+                        data: compressedBase64
+                    });
+
+                    const img = document.createElement('img');
+                    img.src = compressedBase64;
+                    img.alt = file.name;
+                    img.title = file.name;
+                    thumbnailsContainer.appendChild(img);
+                } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    // Límite preventivo para evitar guardar archivos demasiado grandes en una fila de la base de datos.
+                    if (file.size > 5 * 1024 * 1024) {
+                        throw new Error(`El PDF "${file.name}" supera los 5 MB. Elegí un archivo más pequeño.`);
+                    }
+
+                    const dataUrl = await leerArchivoComoDataURL(file);
+                    selectedImagesBase64.push({
+                        tipo: 'pdf',
+                        nombre: file.name,
+                        data: dataUrl
+                    });
+
+                    const pdfCard = document.createElement('div');
+                    pdfCard.className = 'file-preview-pdf';
+                    pdfCard.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:12px; min-width:100px; min-height:100px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; color:#334155; font-size:12px; overflow-wrap:anywhere;';
+                    const icon = document.createElement('span');
+                    icon.textContent = '📄';
+                    icon.style.fontSize = '30px';
+                    const name = document.createElement('span');
+                    name.textContent = file.name;
+                    name.style.maxWidth = '130px';
+                    name.style.textAlign = 'center';
+                    pdfCard.append(icon, name);
+                    thumbnailsContainer.appendChild(pdfCard);
+                } else {
+                    throw new Error(`El archivo "${file.name}" no es una imagen ni un PDF.`);
+                }
+            }
+        } catch (err) {
+            selectedImagesBase64 = [];
+            thumbnailsContainer.innerHTML = '';
+            previewGallery.classList.add('hidden');
+            imagenesInput.value = '';
+            alert(err.message || 'No se pudieron cargar los archivos.');
         }
     });
 }
@@ -194,6 +250,8 @@ if (qrForm) {
             qrForm.reset();
             previewGallery.classList.add('hidden');
             selectedImagesBase64 = [];
+            if (imagenesInput) imagenesInput.value = '';
+            thumbnailsContainer.innerHTML = '';
             await cargarHistorialPorFechas();
         } catch (err) {
             statusMsg.textContent = "Error: " + err.message;
@@ -261,78 +319,110 @@ async function cargarHistorialPorFechas() {
     }
 }
 
+function normalizarAdjuntos(reg) {
+    const elementos = Array.isArray(reg.imagenes) ? reg.imagenes : [];
+    // Compatibilidad con registros antiguos, que guardaban cada imagen como una cadena.
+    return elementos.map((item, index) => {
+        if (typeof item === 'string') {
+            return { tipo: 'imagen', nombre: `${reg.titulo || 'imagen'}_${index + 1}.jpg`, data: item };
+        }
+        return {
+            tipo: item.tipo || (item.data && item.data.startsWith('data:application/pdf') ? 'pdf' : 'imagen'),
+            nombre: item.nombre || `${reg.titulo || 'archivo'}_${index + 1}`,
+            data: item.data || ''
+        };
+    }).filter(item => item.data);
+}
+
 function abrirVisorCarrusel(reg) {
-    if (viewerTitle) viewerTitle.textContent = reg.titulo;
-    if (viewerContent) viewerContent.textContent = reg.contenido || "";
+    if (viewerTitle) viewerTitle.textContent = reg.titulo || 'Registro';
+    if (viewerContent) viewerContent.textContent = reg.contenido || '';
     viewerImages.innerHTML = '';
 
-    if (reg.imagenes && reg.imagenes.length > 0) {
-        currentImagesArray = reg.imagenes;
-        currentIndex = 0;
+    currentImagesArray = normalizarAdjuntos(reg);
+    currentIndex = 0;
 
-        const carContainer = document.createElement('div');
-        carContainer.classList.add('carousel-container');
-
-        const imgTag = document.createElement('img');
-        imgTag.src = currentImagesArray[currentIndex];
-        imgTag.id = "carouselActiveImg";
-        carContainer.appendChild(imgTag);
-
-        const counter = document.createElement('div');
-        counter.classList.add('carousel-counter');
-        counter.id = "carouselCounter";
-        counter.textContent = `1 / ${currentImagesArray.length}`;
-        carContainer.appendChild(counter);
-
-        const btnDownload = document.createElement('a');
-        btnDownload.id = "carouselDownloadBtn";
-        btnDownload.classList.add('carousel-download-btn');
-        btnDownload.innerHTML = '⬇️ Descargar';
-        btnDownload.href = currentImagesArray[currentIndex];
-        btnDownload.download = `${reg.titulo.replace(/\s+/g, '_')}_${currentIndex + 1}.jpg`;
-        carContainer.appendChild(btnDownload);
-
-        if (currentImagesArray.length > 1) {
-            const btnPrev = document.createElement('button');
-            btnPrev.classList.add('carousel-btn', 'carousel-prev');
-            btnPrev.innerHTML = '&#10094;';
-            btnPrev.addEventListener('click', () => cambiarFotoCarrusel(-1, reg.titulo));
-
-            const btnNext = document.createElement('button');
-            btnNext.classList.add('carousel-btn', 'carousel-next');
-            btnNext.innerHTML = '&#10095;';
-            btnNext.addEventListener('click', () => cambiarFotoCarrusel(1, reg.titulo));
-
-            carContainer.appendChild(btnPrev);
-            carContainer.appendChild(btnNext);
-        }
-
-        viewerImages.appendChild(carContainer);
+    if (!currentImagesArray.length) {
+        viewerImages.innerHTML = '<p style="color:white; text-align:center; padding:30px;">Este registro no tiene imágenes ni archivos PDF.</p>';
     } else {
-        viewerImages.innerHTML = '<p style="color:white; text-align:center; padding:30px;">Este registro no tiene imágenes.</p>';
+        mostrarAdjuntoActual(reg.titulo || 'archivo');
     }
 
     viewerModal.classList.remove('hidden');
 }
 
-function cambiarFotoCarrusel(direccion, tituloReg = "imagen") {
-    currentIndex += direccion;
-    if (currentIndex < 0) {
-        currentIndex = currentImagesArray.length - 1;
-    } else if (currentIndex >= currentImagesArray.length) {
-        currentIndex = 0;
+function mostrarAdjuntoActual(tituloReg = 'archivo') {
+    const item = currentImagesArray[currentIndex];
+    if (!item) return;
+
+    viewerImages.innerHTML = '';
+    const container = document.createElement('div');
+    container.className = 'carousel-container';
+    container.style.position = 'relative';
+
+    if (item.tipo === 'pdf') {
+        const pdfViewer = document.createElement('iframe');
+        pdfViewer.src = item.data;
+        pdfViewer.title = item.nombre;
+        pdfViewer.style.cssText = 'width:100%; height:70vh; min-height:400px; border:0; background:#fff; border-radius:8px;';
+        container.appendChild(pdfViewer);
+    } else {
+        const img = document.createElement('img');
+        img.src = item.data;
+        img.id = 'carouselActiveImg';
+        img.alt = item.nombre;
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '70vh';
+        img.style.objectFit = 'contain';
+        container.appendChild(img);
     }
 
-    const activeImg = document.getElementById('carouselActiveImg');
-    const counter = document.getElementById('carouselCounter');
-    const btnDownload = document.getElementById('carouselDownloadBtn');
+    const counter = document.createElement('div');
+    counter.className = 'carousel-counter';
+    counter.id = 'carouselCounter';
+    counter.textContent = `${currentIndex + 1} / ${currentImagesArray.length}`;
+    container.appendChild(counter);
 
-    if (activeImg) activeImg.src = currentImagesArray[currentIndex];
-    if (counter) counter.textContent = `${currentIndex + 1} / ${currentImagesArray.length}`;
-    if (btnDownload) {
-        btnDownload.href = currentImagesArray[currentIndex];
-        btnDownload.download = `${tituloReg.replace(/\s+/g, '_')}_${currentIndex + 1}.jpg`;
+    const download = document.createElement('a');
+    download.id = 'carouselDownloadBtn';
+    download.className = 'carousel-download-btn';
+    download.textContent = '⬇️ Descargar';
+    download.href = item.data;
+    download.download = item.nombre || `${tituloReg.replace(/\s+/g, '_')}_${currentIndex + 1}`;
+    download.target = '_blank';
+    download.rel = 'noopener';
+    container.appendChild(download);
+
+    const filename = document.createElement('p');
+    filename.textContent = item.nombre;
+    filename.style.cssText = 'color:white; text-align:center; overflow-wrap:anywhere; padding:8px;';
+    container.appendChild(filename);
+
+    if (currentImagesArray.length > 1) {
+        const prev = document.createElement('button');
+        prev.className = 'carousel-btn carousel-prev';
+        prev.innerHTML = '&#10094;';
+        prev.type = 'button';
+        prev.setAttribute('aria-label', 'Archivo anterior');
+        prev.addEventListener('click', () => cambiarFotoCarrusel(-1, tituloReg));
+
+        const next = document.createElement('button');
+        next.className = 'carousel-btn carousel-next';
+        next.innerHTML = '&#10095;';
+        next.type = 'button';
+        next.setAttribute('aria-label', 'Archivo siguiente');
+        next.addEventListener('click', () => cambiarFotoCarrusel(1, tituloReg));
+
+        container.append(prev, next);
     }
+
+    viewerImages.appendChild(container);
+}
+
+function cambiarFotoCarrusel(direccion, tituloReg = 'archivo') {
+    if (!currentImagesArray.length) return;
+    currentIndex = (currentIndex + direccion + currentImagesArray.length) % currentImagesArray.length;
+    mostrarAdjuntoActual(tituloReg);
 }
 
 if (btnCloseViewer) {
