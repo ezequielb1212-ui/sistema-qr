@@ -70,7 +70,7 @@ btnToggleSidebar.addEventListener('click', () => {
     mainContent.classList.toggle('expanded');
 });
 
-// Función de compresión automática ultra eficiente para evitar el "statement timeout"
+// Compresión automática ultra eficiente para evitar el error de timeout al subir múltiples imágenes
 function optimizarBase64(base64Str, maxWidth = 1200, quality = 0.70) {
     return new Promise((resolve) => {
         if (typeof base64Str === 'string' && base64Str.startsWith('data:application/pdf')) {
@@ -332,7 +332,6 @@ if (qrForm) {
             const year = fecha.getFullYear().toString();
             const month = (fecha.getMonth() + 1).toString().padStart(2, '0');
 
-            // Optimiza de forma ultra eficiente todas las hojas antes de enviar
             const payloadImagenes = await Promise.all(
                 loadedFilesData.map(item => optimizarBase64(item.data))
             );
@@ -362,12 +361,34 @@ if (qrForm) {
     });
 }
 
-if (btnPrint) btnPrint.addEventListener('click', () => window.print());
+// BOTÓN IMPRIMIR CON MEMBRETE OFICIAL Y FECHA/HORA EXACTA
+if (btnPrint) {
+    btnPrint.addEventListener('click', () => {
+        let printHeader = qrActions.querySelector('.print-header');
+        if (!printHeader) {
+            printHeader = document.createElement('div');
+            printHeader.className = 'print-header';
+            qrActions.insertBefore(printHeader, qrcodeContainer);
+        }
+
+        const ahora = new Date();
+        const fechaFormateada = ahora.toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        const horaFormateada = ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+        printHeader.innerHTML = `
+            <h3>Dir. de Derivación y Traslado Seguro (LA RIOJA)</h3>
+            <p>Fecha de impresión: ${fechaFormateada} - Hora: ${horaFormateada}</p>
+        `;
+
+        window.print();
+    });
+}
+
 if (btnCopy) btnCopy.addEventListener('click', () => {
     if (ultimoContenidoQR) navigator.clipboard.writeText(ultimoContenidoQR).then(() => alert("¡Enlace copiado!"));
 });
 
-// CARGA OPTIMIZADA DEL HISTORIAL (LAZY LOADING DE CAMPOS PESADOS)
+// CARGA OPTIMIZADA DEL HISTORIAL
 async function cargarHistorialPorFechas() {
     try {
         treeMenu.innerHTML = '<p style="font-size:0.8rem; color:#64748b; text-align:center; margin-top:15px;">Cargando...</p>';
