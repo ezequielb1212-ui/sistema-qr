@@ -1,6 +1,6 @@
 :root {
     --primary: #2563eb;
-    --primary-hover: #d81d2d;
+    --primary-hover: #1d4ed8;
     --bg-color: #f1f5f9;
     --card-bg: #ffffff;
     --text-main: #1e293b;
@@ -386,7 +386,7 @@ textarea:focus {
     background-color: #cbd5e1;
 }
 
-/* MODALES */
+/* MODALES Y EDITOR */
 .modal {
     position: fixed;
     top: 0;
@@ -404,7 +404,7 @@ textarea:focus {
 .modal-content {
     background: #1e293b;
     width: 100%;
-    max-width: 750px;
+    max-width: 850px;
     height: 85vh;
     border-radius: 12px;
     display: flex;
@@ -517,9 +517,9 @@ textarea:focus {
     z-index: 20;
 }
 
-/* EDITOR CAMSCANNER CONTROLES */
+/* EDITOR CROPPER & CAMSCANNER CONTROLES */
 .editor-modal-content {
-    max-width: 900px;
+    max-width: 950px;
 }
 
 .editor-body {
@@ -535,16 +535,12 @@ textarea:focus {
     align-items: center;
     padding: 15px;
     overflow: hidden;
-}
-
-#editorCanvas {
-    max-width: 100%;
-    max-height: 70vh;
-    box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    height: 100%;
+    background: #000;
 }
 
 .editor-controls {
-    width: 250px;
+    width: 260px;
     padding: 15px;
     background: #1e293b;
     display: flex;
