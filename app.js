@@ -47,7 +47,7 @@ const brightnessInput = document.getElementById('brightnessInput');
 const contrastInput = document.getElementById('contrastInput');
 const btnSaveEdit = document.getElementById('btnSaveEdit');
 
-let loadedFilesData = []; // [{ type: 'image'|'pdf', data: base64/url, name: string }]
+let loadedFilesData = [];
 let currentEditingIndex = null;
 let currentImageObject = null;
 let currentRotation = 0;
@@ -106,7 +106,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
+    loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (userInput.value.trim() === ADMIN_USER && passInput.value.trim() === ADMIN_PASS) {
             localStorage.setItem('adminLogueado', 'true');
@@ -119,7 +119,7 @@ if (loginForm) {
                 mainContent.classList.add('expanded');
             }
 
-            cargarHistorialPorFechas();
+            await cargarHistorialPorFechas();
             loginForm.reset();
         } else {
             alert("Usuario o contraseña incorrectos.");
@@ -233,7 +233,6 @@ function aplicarFiltrosYCargarCanvas() {
     ctx.translate(editorCanvas.width / 2, editorCanvas.height / 2);
     ctx.rotate((currentRotation * Math.PI) / 180);
     
-    // Aplicar Brillo y Contraste con Filter CSS
     const brightness = brightnessInput.value;
     const contrast = contrastInput.value;
     ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
@@ -245,13 +244,11 @@ function aplicarFiltrosYCargarCanvas() {
     );
     ctx.restore();
 
-    // Filtro Blanco y Negro tipo documento (CamScanner)
     if (isBw) {
         const imgData = ctx.getImageData(0, 0, editorCanvas.width, editorCanvas.height);
         const data = imgData.data;
         for (let i = 0; i < data.length; i += 4) {
             const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-            // Umbral de contraste para escáner
             const bw = avg > 120 ? 255 : 0;
             data[i] = bw;
             data[i + 1] = bw;
@@ -302,7 +299,6 @@ if (qrForm) {
             const year = fecha.getFullYear().toString();
             const month = (fecha.getMonth() + 1).toString().padStart(2, '0');
 
-            // Guardamos las imágenes y PDFs en Base64
             const payloadImagenes = loadedFilesData.map(item => item.data);
 
             const { data, error } = await supabase
@@ -338,7 +334,14 @@ if (btnCopy) btnCopy.addEventListener('click', () => {
 // HISTORIAL Y ELIMINACIÓN DE PACIENTES
 async function cargarHistorialPorFechas() {
     try {
-        const { data } = await supabase.from('foto_qr_lr').select('*').order('created_at', { ascending: false });
+        console.log("Cargando historial desde Supabase...");
+        const { data, error } = await supabase
+            .from('foto_qr_lr')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
         treeMenu.innerHTML = '';
         if (!data || data.length === 0) {
             treeMenu.innerHTML = '<p style="font-size:0.8rem; color:#64748b; text-align:center; margin-top:15px;">Sin registros.</p>';
@@ -347,8 +350,15 @@ async function cargarHistorialPorFechas() {
 
         const estructura = {};
         data.forEach(reg => {
-            const y = reg.year || '2026';
-            const m = reg.month || '10';
+            // Si no tiene año o mes guardado, lo extraemos de created_at o usamos la fecha actual
+            let y = reg.year;
+            let m = reg.month;
+            if (!y || !m) {
+                const d = reg.created_at ? new Date(reg.created_at) : new Date();
+                y = d.getFullYear().toString();
+                m = (d.getMonth() + 1).toString().padStart(2, '0');
+            }
+
             if (!estructura[y]) estructura[y] = {};
             if (!estructura[y][m]) estructura[y][m] = [];
             estructura[y][m].push(reg);
@@ -402,7 +412,8 @@ async function cargarHistorialPorFechas() {
             treeMenu.appendChild(yDiv);
         }
     } catch (err) {
-        console.error(err);
+        console.error("Error al cargar historial:", err);
+        treeMenu.innerHTML = `<p style="font-size:0.8rem; color:red; text-align:center; margin-top:15px;">Error al cargar historial.</p>`;
     }
 }
 
