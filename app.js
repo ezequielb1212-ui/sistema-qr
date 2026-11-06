@@ -70,6 +70,36 @@ btnToggleSidebar.addEventListener('click', () => {
     mainContent.classList.toggle('expanded');
 });
 
+// Función de compresión automática ultra eficiente para evitar el "statement timeout"
+function optimizarBase64(base64Str, maxWidth = 1200, quality = 0.70) {
+    return new Promise((resolve) => {
+        if (typeof base64Str === 'string' && base64Str.startsWith('data:application/pdf')) {
+            return resolve(base64Str);
+        }
+        
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(base64Str);
+        img.src = base64Str;
+    });
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const recordId = urlParams.get('id');
@@ -294,14 +324,18 @@ if (qrForm) {
         const titulo = document.getElementById('titulo').value.trim();
         const contenido = document.getElementById('contenido').value.trim();
 
-        statusMsg.textContent = "Guardando...";
+        statusMsg.textContent = "Comprimiendo fotos y guardando...";
         statusMsg.classList.remove('hidden');
 
         try {
             const fecha = new Date();
             const year = fecha.getFullYear().toString();
             const month = (fecha.getMonth() + 1).toString().padStart(2, '0');
-            const payloadImagenes = loadedFilesData.map(item => item.data);
+
+            // Optimiza de forma ultra eficiente todas las hojas antes de enviar
+            const payloadImagenes = await Promise.all(
+                loadedFilesData.map(item => optimizarBase64(item.data))
+            );
 
             const { data, error } = await supabase
                 .from('foto_qr_lr')
@@ -323,7 +357,7 @@ if (qrForm) {
             loadedFilesData = [];
             await cargarHistorialPorFechas();
         } catch (err) {
-            statusMsg.textContent = "Error: " + err.message;
+            statusMsg.textContent = "Error al guardar: " + err.message;
         }
     });
 }
