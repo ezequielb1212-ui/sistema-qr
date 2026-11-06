@@ -1,7 +1,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 const SUPABASE_URL = 'https://xdbquvontcxjymxharmr.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYnF1dm9udCXjymxharmrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNzYwNjMsImV4cCI6MjEwNjk1MjA2M30.YSQmfv6LFulZa9RIP7VnfL4UZXYobhsEUKOKGOI9Ilk';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYnF1dm9udGN4anlteGhhcm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNzYwNjMsImV4cCI6MjEwNjk1MjA2M30.YSQmfv6LFulZa9RIP7VnfL4UZXYobhsEUKOKGOI9Ilk';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
@@ -35,9 +35,10 @@ const viewerTitle = document.getElementById('viewerTitle');
 const viewerContent = document.getElementById('viewerContent');
 const viewerImages = document.getElementById('viewerImages');
 
+// Editor & Cropper
 const editorModal = document.getElementById('editorModal');
 const btnCloseEditor = document.getElementById('btnCloseEditor');
-const editorCanvas = document.getElementById('editorCanvas');
+const editorImage = document.getElementById('editorImage');
 const btnRotateLeft = document.getElementById('btnRotateLeft');
 const btnRotateRight = document.getElementById('btnRotateRight');
 const btnBwFilter = document.getElementById('btnBwFilter');
@@ -48,8 +49,7 @@ const btnSaveEdit = document.getElementById('btnSaveEdit');
 
 let loadedFilesData = [];
 let currentEditingIndex = null;
-let currentImageObject = null;
-let currentRotation = 0;
+let cropperInstance = null;
 let isBw = false;
 
 let ultimoContenidoQR = "";
@@ -179,7 +179,7 @@ function renderThumbnails() {
             
             const overlay = document.createElement('div');
             overlay.classList.add('edit-overlay');
-            overlay.textContent = '✏️ Editar';
+            overlay.textContent = '✂️ Recortar';
             thumb.appendChild(overlay);
 
             thumb.addEventListener('click', () => abrirEditorCamScanner(index));
@@ -193,88 +193,99 @@ function renderThumbnails() {
     });
 }
 
+// CROPPER & EDICIÓN CAMSCANNER
 function abrirEditorCamScanner(index) {
     currentEditingIndex = index;
-    currentRotation = 0;
     isBw = false;
     brightnessInput.value = 100;
     contrastInput.value = 100;
 
-    const img = new Image();
-    img.onload = () => {
-        currentImageObject = img;
-        aplicarFiltrosYCargarCanvas();
-        editorModal.classList.remove('hidden');
-    };
-    img.src = loadedFilesData[index].data;
-}
-
-function aplicarFiltrosYCargarCanvas() {
-    if (!currentImageObject) return;
-
-    const ctx = editorCanvas.getContext('2d');
-    const width = currentImageObject.width;
-    const height = currentImageObject.height;
-
-    if (currentRotation % 180 !== 0) {
-        editorCanvas.width = height;
-        editorCanvas.height = width;
-    } else {
-        editorCanvas.width = width;
-        editorCanvas.height = height;
+    if (cropperInstance) {
+        cropperInstance.destroy();
+        cropperInstance = null;
     }
 
-    ctx.clearRect(0, 0, editorCanvas.width, editorCanvas.height);
-    ctx.save();
+    editorImage.src = loadedFilesData[index].data;
+    editorModal.classList.remove('hidden');
 
-    ctx.translate(editorCanvas.width / 2, editorCanvas.height / 2);
-    ctx.rotate((currentRotation * Math.PI) / 180);
+    cropperInstance = new Cropper(editorImage, {
+        viewMode: 1,
+        autoCropArea: 0.9,
+        responsive: true,
+        background: false
+    });
     
+    aplicarFiltrosCSS();
+}
+
+function aplicarFiltrosCSS() {
     const brightness = brightnessInput.value;
     const contrast = contrastInput.value;
-    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
-
-    ctx.drawImage(currentImageObject, -width / 2, -height / 2);
-    ctx.restore();
-
-    if (isBw) {
-        const imgData = ctx.getImageData(0, 0, editorCanvas.width, editorCanvas.height);
-        const data = imgData.data;
-        for (let i = 0; i < data.length; i += 4) {
-            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-            const bw = avg > 120 ? 255 : 0;
-            data[i] = bw;
-            data[i + 1] = bw;
-            data[i + 2] = bw;
-        }
-        ctx.putImageData(imgData, 0, 0);
+    const cropperCanvas = document.querySelector('.cropper-container .cropper-canvas img');
+    if (cropperCanvas) {
+        let filterVal = `brightness(${brightness}%) contrast(${contrast}%)`;
+        if (isBw) filterVal += ` grayscale(100%) contrast(150%)`;
+        cropperCanvas.style.filter = filterVal;
     }
 }
 
-if (btnRotateLeft) btnRotateLeft.addEventListener('click', () => { currentRotation -= 90; aplicarFiltrosYCargarCanvas(); });
-if (btnRotateRight) btnRotateRight.addEventListener('click', () => { currentRotation += 90; aplicarFiltrosYCargarCanvas(); });
-if (btnBwFilter) btnBwFilter.addEventListener('click', () => { isBw = !isBw; aplicarFiltrosYCargarCanvas(); });
+if (btnRotateLeft) btnRotateLeft.addEventListener('click', () => cropperInstance && cropperInstance.rotate(-90));
+if (btnRotateRight) btnRotateRight.addEventListener('click', () => cropperInstance && cropperInstance.rotate(90));
+if (btnBwFilter) btnBwFilter.addEventListener('click', () => { isBw = !isBw; aplicarFiltrosCSS(); });
 if (btnResetFilter) btnResetFilter.addEventListener('click', () => {
-    currentRotation = 0;
     isBw = false;
     brightnessInput.value = 100;
     contrastInput.value = 100;
-    aplicarFiltrosYCargarCanvas();
+    if (cropperInstance) cropperInstance.reset();
+    aplicarFiltrosCSS();
 });
-if (brightnessInput) brightnessInput.addEventListener('input', aplicarFiltrosYCargarCanvas);
-if (contrastInput) contrastInput.addEventListener('input', aplicarFiltrosYCargarCanvas);
+if (brightnessInput) brightnessInput.addEventListener('input', aplicarFiltrosCSS);
+if (contrastInput) contrastInput.addEventListener('input', aplicarFiltrosCSS);
 
 if (btnSaveEdit) {
     btnSaveEdit.addEventListener('click', () => {
-        const editedBase64 = editorCanvas.toDataURL('image/jpeg', 0.9);
-        loadedFilesData[currentEditingIndex].data = editedBase64;
+        if (!cropperInstance) return;
+
+        const canvas = cropperInstance.getCroppedCanvas({
+            maxWidth: 1600,
+            maxHeight: 1600
+        });
+
+        if (isBw || brightnessInput.value !== "100" || contrastInput.value !== "100") {
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                if (isBw) {
+                    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                    const bw = avg > 125 ? 255 : 0;
+                    data[i] = bw;
+                    data[i + 1] = bw;
+                    data[i + 2] = bw;
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        const croppedBase64 = canvas.toDataURL('image/jpeg', 0.88);
+        loadedFilesData[currentEditingIndex].data = croppedBase64;
         renderThumbnails();
+
+        cropperInstance.destroy();
+        cropperInstance = null;
         editorModal.classList.add('hidden');
     });
 }
 
 if (btnCloseEditor) {
-    btnCloseEditor.addEventListener('click', () => editorModal.classList.add('hidden'));
+    btnCloseEditor.addEventListener('click', () => {
+        if (cropperInstance) {
+            cropperInstance.destroy();
+            cropperInstance = null;
+        }
+        editorModal.classList.add('hidden');
+    });
 }
 
 if (qrForm) {
@@ -322,14 +333,15 @@ if (btnCopy) btnCopy.addEventListener('click', () => {
     if (ultimoContenidoQR) navigator.clipboard.writeText(ultimoContenidoQR).then(() => alert("¡Enlace copiado!"));
 });
 
+// CARGA OPTIMIZADA DEL HISTORIAL (LAZY LOADING DE CAMPOS PESADOS)
 async function cargarHistorialPorFechas() {
     try {
         treeMenu.innerHTML = '<p style="font-size:0.8rem; color:#64748b; text-align:center; margin-top:15px;">Cargando...</p>';
         
-        // Consulta simplificada para evitar errores de columnas faltantes
         const { data, error } = await supabase
             .from('foto_qr_lr')
-            .select('id, titulo, contenido, imagenes, year, month, created_at');
+            .select('id, titulo, year, month, created_at')
+            .order('created_at', { ascending: false });
 
         if (error) throw error;
 
@@ -341,10 +353,10 @@ async function cargarHistorialPorFechas() {
 
         const estructura = {};
         data.forEach(reg => {
-            let y = reg.year || '2026';
-            let m = reg.month || '10';
-            if (reg.created_at && (!reg.year || !reg.month)) {
-                const d = new Date(reg.created_at);
+            let y = reg.year;
+            let m = reg.month;
+            if (!y || !m) {
+                const d = reg.created_at ? new Date(reg.created_at) : new Date();
                 y = d.getFullYear().toString();
                 m = (d.getMonth() + 1).toString().padStart(2, '0');
             }
@@ -375,7 +387,7 @@ async function cargarHistorialPorFechas() {
                     title.classList.add('record-item-title');
                     title.textContent = reg.titulo || 'Sin nombre';
                     title.addEventListener('click', () => {
-                        abrirVisorCarrusel(reg);
+                        obtenerYVisualizarDetalle(reg.id);
                         if (window.innerWidth <= 768) {
                             sidebar.classList.add('collapsed');
                             mainContent.classList.add('expanded');
@@ -403,7 +415,22 @@ async function cargarHistorialPorFechas() {
         }
     } catch (err) {
         console.error("Error al cargar historial:", err);
-        treeMenu.innerHTML = `<p style="font-size:0.75rem; color:red; text-align:center; margin-top:15px; padding:0 5px;">Error: ${err.message}</p>`;
+        treeMenu.innerHTML = `<p style="font-size:0.75rem; color:red; text-align:center; margin-top:15px; padding:0 5px;">Error al cargar: ${err.message}</p>`;
+    }
+}
+
+async function obtenerYVisualizarDetalle(id) {
+    try {
+        const { data, error } = await supabase
+            .from('foto_qr_lr')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+        if (data) abrirVisorCarrusel(data);
+    } catch (err) {
+        alert("Error al obtener los datos del paciente: " + err.message);
     }
 }
 
@@ -443,6 +470,12 @@ function abrirVisorCarrusel(reg) {
 function renderElementoCarrusel(tituloReg) {
     viewerImages.innerHTML = '';
     const fileData = currentImagesArray[currentIndex];
+    
+    if (!fileData) {
+        viewerImages.innerHTML = '<p style="color:white; text-align:center; padding:30px;">Archivo no disponible o dañado.</p>';
+        return;
+    }
+
     const carContainer = document.createElement('div');
     carContainer.classList.add('carousel-container');
 
@@ -455,6 +488,10 @@ function renderElementoCarrusel(tituloReg) {
     } else {
         const imgTag = document.createElement('img');
         imgTag.src = fileData;
+        imgTag.onerror = () => {
+            imgTag.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
+            imgTag.style.opacity = '0.5';
+        };
         carContainer.appendChild(imgTag);
     }
 
