@@ -6,19 +6,17 @@
     <title>Sistema de Gestión de Registros y QR</title>
     <!-- Librería para generar códigos QR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Librería PDF.js para renderizar previsualizaciones de PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- ==========================================
-        PANTALLA DE LOGIN
-        ========================================== -->
+    <!-- PANTALLA DE LOGIN -->
     <div id="loginContainer" class="login-wrapper">
         <div class="login-card">
-            <!-- Logo opcional arriba del título -->
             <img src="imagenes22/movil 8 .png" alt="Logo del Sistema" class="login-logo">
-            
-            <h2>Acceso al Sistema Qr Derivacion</h2>
+            <h2>Acceso al Sistema QR Derivación</h2>
             <form id="loginForm">
                 <div class="input-group">
                     <label for="userInput">Correo electrónico</label>
@@ -33,15 +31,13 @@
         </div>
     </div>
 
-    <!-- ==========================================
-        APLICACIÓN PRINCIPAL (PANEL ADMIN Y FORMULARIO)
-        ========================================== -->
+    <!-- APLICACIÓN PRINCIPAL -->
     <div id="appContainer" class="app-layout hidden">
         
-        <!-- Sidebar / Historial Lateral Retráctil -->
+        <!-- Sidebar / Historial Lateral -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h3>Historial</h3>
+                <h3>Historial Pacientes</h3>
                 <button id="btnLogout" class="btn-logout">Salir</button>
             </div>
             <div id="treeMenu" class="tree-menu">
@@ -57,24 +53,21 @@
                 <form id="qrForm">
                     <div class="input-group">
                         <label for="titulo">Nombre y Apellido Paciente</label>
-                        <input type="text" id="titulo" required placeholder="Ej: Mantenimiento Unidad 03">
+                        <input type="text" id="titulo" required placeholder="Ej: Juan Pérez">
                     </div>
 
                     <div class="input-group">
-                        <label for="contenido">Obra Social </label>
+                        <label for="contenido">Obra Social / Detalle</label>
                         <textarea id="contenido" required placeholder="Detalles de la información..."></textarea>
                     </div>
 
                     <div class="input-group">
-                        <label class="file-label" for="imagenesInput">📁 Seleccionar Imágenes y PDF</label>
-                        <input type="file" id="imagenesInput" accept="image/*,application/pdf,.pdf" multiple style="display: none;">
-                        <small style="display:block; margin-top:8px; color:var(--text-muted);">
-                            Podés seleccionar imágenes y archivos PDF. Se guardarán asociados al código QR.
-                        </small>
+                        <label class="file-label" for="archivosInput">📁 Adjuntar Fotos o PDFs</label>
+                        <input type="file" id="archivosInput" accept="image/*,application/pdf" multiple style="display: none;">
                     </div>
 
                     <div id="previewGallery" class="hidden">
-                        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Imágenes seleccionadas:</label>
+                        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Archivos seleccionados (haz clic en una imagen para editar estilo CamScanner):</label>
                         <div class="thumbnails-container" id="thumbnailsContainer"></div>
                     </div>
 
@@ -83,7 +76,7 @@
 
                 <div id="statusMsg" class="hidden" style="margin-top: 15px; font-weight: 600; text-align: center;"></div>
 
-                <!-- Sección de resultado del QR -->
+                <!-- Sección del QR resultante -->
                 <div id="qrActions" class="qr-result-section hidden">
                     <div id="qrcode"></div>
                     <div class="action-buttons">
@@ -95,9 +88,7 @@
         </main>
     </div>
 
-    <!-- ==========================================
-        VISOR DE IMÁGENES / MODAL (CARRUSEL 1 X 1)
-        ========================================== -->
+    <!-- MODAL VISOR CARRUSEL -->
     <div id="viewerModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -107,11 +98,44 @@
                 </div>
                 <button id="btnCloseViewer" class="btn-close">&times;</button>
             </div>
-            <div class="modal-body" id="viewerImages">
-                <!-- Carrusel inyectado por JS -->
+            <div class="modal-body" id="viewerImages"></div>
+        </div>
+    </div>
+
+    <!-- MODAL EDITOR ESTILO CAMSCANNER -->
+    <div id="editorModal" class="modal hidden">
+        <div class="modal-content editor-modal-content">
+            <div class="modal-header">
+                <h3>Edición CamScanner - Mejorar Imagen</h3>
+                <button id="btnCloseEditor" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body editor-body">
+                <div class="canvas-container">
+                    <canvas id="editorCanvas"></canvas>
+                </div>
+                <div class="editor-controls">
+                    <button id="btnRotateLeft" class="btn-secondary">🔄 Rotar Izq</button>
+                    <button id="btnRotateRight" class="btn-secondary">🔄 Rotar Der</button>
+                    <button id="btnBwFilter" class="btn-secondary">📄 Blanco y Negro (Escáner)</button>
+                    <button id="btnResetFilter" class="btn-secondary">⏮️ Reset</button>
+                    
+                    <div class="slider-group">
+                        <label>Brillo</label>
+                        <input type="range" id="brightnessInput" min="50" max="150" value="100">
+                    </div>
+                    <div class="slider-group">
+                        <label>Contraste</label>
+                        <input type="range" id="contrastInput" min="50" max="200" value="100">
+                    </div>
+                    <button id="btnSaveEdit" class="btn-primary">💾 Guardar Cambios</button>
+                </div>
             </div>
         </div>
     </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
 
     <script type="module" src="app.js"></script>
 </body>
