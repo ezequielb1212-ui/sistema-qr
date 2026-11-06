@@ -25,7 +25,7 @@ const btnPrint = document.getElementById('btnPrint');
 const btnCopy = document.getElementById('btnCopy');
 const treeMenu = document.getElementById('treeMenu');
 
-const imagenesInput = document.getElementById('imagenesInput');
+const archivosInput = document.getElementById('archivosInput');
 const previewGallery = document.getElementById('previewGallery');
 const thumbnailsContainer = document.getElementById('thumbnailsContainer');
 
@@ -35,7 +35,24 @@ const viewerTitle = document.getElementById('viewerTitle');
 const viewerContent = document.getElementById('viewerContent');
 const viewerImages = document.getElementById('viewerImages');
 
-let selectedImagesBase64 = []; // Admite imágenes (data URL) y PDF (objetos con nombre y data URL)
+// Editor CamScanner variables
+const editorModal = document.getElementById('editorModal');
+const btnCloseEditor = document.getElementById('btnCloseEditor');
+const editorCanvas = document.getElementById('editorCanvas');
+const btnRotateLeft = document.getElementById('btnRotateLeft');
+const btnRotateRight = document.getElementById('btnRotateRight');
+const btnBwFilter = document.getElementById('btnBwFilter');
+const btnResetFilter = document.getElementById('btnResetFilter');
+const brightnessInput = document.getElementById('brightnessInput');
+const contrastInput = document.getElementById('contrastInput');
+const btnSaveEdit = document.getElementById('btnSaveEdit');
+
+let loadedFilesData = []; // [{ type: 'image'|'pdf', data: base64/url, name: string }]
+let currentEditingIndex = null;
+let currentImageObject = null;
+let currentRotation = 0;
+let isBw = false;
+
 let ultimoContenidoQR = "";
 let currentImagesArray = [];
 let currentIndex = 0;
@@ -117,107 +134,160 @@ if (btnLogout) {
     });
 }
 
-function comprimirImagen(file, maxWidth = 1600, quality = 0.92) {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-                if (width > maxWidth) {
-                    height = Math.round((height * maxWidth) / width);
-                    width = maxWidth;
-                }
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                resolve(canvas.toDataURL('image/jpeg', quality));
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
-}
-
-function leerArchivoComoDataURL(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error(`No se pudo leer el archivo ${file.name}`));
-        reader.readAsDataURL(file);
-    });
-}
-
-if (imagenesInput) {
-    imagenesInput.addEventListener('change', async (e) => {
-        const files = Array.from(e.target.files || []);
-        selectedImagesBase64 = [];
+// Cargar Archivos (Fotos y PDFs)
+if (archivosInput) {
+    archivosInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        loadedFilesData = [];
         thumbnailsContainer.innerHTML = '';
-
-        if (!files.length) {
-            previewGallery.classList.add('hidden');
-            return;
-        }
-
-        previewGallery.classList.remove('hidden');
-
-        try {
-            for (const file of files) {
+        
+        if (files.length > 0) {
+            previewGallery.classList.remove('hidden');
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
                 if (file.type.startsWith('image/')) {
-                    const compressedBase64 = await comprimirImagen(file);
-                    selectedImagesBase64.push({
-                        tipo: 'imagen',
-                        nombre: file.name,
-                        data: compressedBase64
-                    });
-
-                    const img = document.createElement('img');
-                    img.src = compressedBase64;
-                    img.alt = file.name;
-                    img.title = file.name;
-                    thumbnailsContainer.appendChild(img);
-                } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-                    // Límite preventivo para evitar guardar archivos demasiado grandes en una fila de la base de datos.
-                    if (file.size > 5 * 1024 * 1024) {
-                        throw new Error(`El PDF "${file.name}" supera los 5 MB. Elegí un archivo más pequeño.`);
-                    }
-
-                    const dataUrl = await leerArchivoComoDataURL(file);
-                    selectedImagesBase64.push({
-                        tipo: 'pdf',
-                        nombre: file.name,
-                        data: dataUrl
-                    });
-
-                    const pdfCard = document.createElement('div');
-                    pdfCard.className = 'file-preview-pdf';
-                    pdfCard.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:12px; min-width:100px; min-height:100px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; color:#334155; font-size:12px; overflow-wrap:anywhere;';
-                    const icon = document.createElement('span');
-                    icon.textContent = '📄';
-                    icon.style.fontSize = '30px';
-                    const name = document.createElement('span');
-                    name.textContent = file.name;
-                    name.style.maxWidth = '130px';
-                    name.style.textAlign = 'center';
-                    pdfCard.append(icon, name);
-                    thumbnailsContainer.appendChild(pdfCard);
-                } else {
-                    throw new Error(`El archivo "${file.name}" no es una imagen ni un PDF.`);
+                    const base64 = await fileToBase64(file);
+                    loadedFilesData.push({ type: 'image', data: base64, name: file.name });
+                } else if (file.type === 'application/pdf') {
+                    const base64 = await fileToBase64(file);
+                    loadedFilesData.push({ type: 'pdf', data: base64, name: file.name });
                 }
             }
-        } catch (err) {
-            selectedImagesBase64 = [];
-            thumbnailsContainer.innerHTML = '';
+            renderThumbnails();
+        } else {
             previewGallery.classList.add('hidden');
-            imagenesInput.value = '';
-            alert(err.message || 'No se pudieron cargar los archivos.');
         }
     });
 }
 
+function fileToBase64(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(file);
+    });
+}
+
+function renderThumbnails() {
+    thumbnailsContainer.innerHTML = '';
+    loadedFilesData.forEach((item, index) => {
+        const thumb = document.createElement('div');
+        thumb.classList.add('thumb-item');
+
+        if (item.type === 'image') {
+            const img = document.createElement('img');
+            img.src = item.data;
+            thumb.appendChild(img);
+            
+            const overlay = document.createElement('div');
+            overlay.classList.add('edit-overlay');
+            overlay.textContent = '✏️ Editar';
+            thumb.appendChild(overlay);
+
+            thumb.addEventListener('click', () => abrirEditorCamScanner(index));
+        } else {
+            const pdfBadge = document.createElement('div');
+            pdfBadge.classList.add('pdf-badge');
+            pdfBadge.innerHTML = '📄 PDF';
+            thumb.appendChild(pdfBadge);
+        }
+        thumbnailsContainer.appendChild(thumb);
+    });
+}
+
+// --- EDITOR CAMSCANNER ---
+function abrirEditorCamScanner(index) {
+    currentEditingIndex = index;
+    currentRotation = 0;
+    isBw = false;
+    brightnessInput.value = 100;
+    contrastInput.value = 100;
+
+    const img = new Image();
+    img.onload = () => {
+        currentImageObject = img;
+        aplicarFiltrosYCargarCanvas();
+        editorModal.classList.remove('hidden');
+    };
+    img.src = loadedFilesData[index].data;
+}
+
+function aplicarFiltrosYCargarCanvas() {
+    if (!currentImageObject) return;
+
+    const ctx = editorCanvas.getContext('2d');
+    const width = currentImageObject.width;
+    const height = currentImageObject.height;
+
+    if (currentRotation % 180 !== 0) {
+        editorCanvas.width = height;
+        editorCanvas.height = width;
+    } else {
+        editorCanvas.width = width;
+        editorCanvas.height = height;
+    }
+
+    ctx.clearRect(0, 0, editorCanvas.width, editorCanvas.height);
+    ctx.save();
+
+    ctx.translate(editorCanvas.width / 2, editorCanvas.height / 2);
+    ctx.rotate((currentRotation * Math.PI) / 180);
+    
+    // Aplicar Brillo y Contraste con Filter CSS
+    const brightness = brightnessInput.value;
+    const contrast = contrastInput.value;
+    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+
+    ctx.drawImage(
+        currentImageObject,
+        -width / 2,
+        -height / 2
+    );
+    ctx.restore();
+
+    // Filtro Blanco y Negro tipo documento (CamScanner)
+    if (isBw) {
+        const imgData = ctx.getImageData(0, 0, editorCanvas.width, editorCanvas.height);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            // Umbral de contraste para escáner
+            const bw = avg > 120 ? 255 : 0;
+            data[i] = bw;
+            data[i + 1] = bw;
+            data[i + 2] = bw;
+        }
+        ctx.putImageData(imgData, 0, 0);
+    }
+}
+
+if (btnRotateLeft) btnRotateLeft.addEventListener('click', () => { currentRotation -= 90; aplicarFiltrosYCargarCanvas(); });
+if (btnRotateRight) btnRotateRight.addEventListener('click', () => { currentRotation += 90; aplicarFiltrosYCargarCanvas(); });
+if (btnBwFilter) btnBwFilter.addEventListener('click', () => { isBw = !isBw; aplicarFiltrosYCargarCanvas(); });
+if (btnResetFilter) btnResetFilter.addEventListener('click', () => {
+    currentRotation = 0;
+    isBw = false;
+    brightnessInput.value = 100;
+    contrastInput.value = 100;
+    aplicarFiltrosYCargarCanvas();
+});
+if (brightnessInput) brightnessInput.addEventListener('input', aplicarFiltrosYCargarCanvas);
+if (contrastInput) contrastInput.addEventListener('input', aplicarFiltrosYCargarCanvas);
+
+if (btnSaveEdit) {
+    btnSaveEdit.addEventListener('click', () => {
+        const editedBase64 = editorCanvas.toDataURL('image/jpeg', 0.9);
+        loadedFilesData[currentEditingIndex].data = editedBase64;
+        renderThumbnails();
+        editorModal.classList.add('hidden');
+    });
+}
+
+if (btnCloseEditor) {
+    btnCloseEditor.addEventListener('click', () => editorModal.classList.add('hidden'));
+}
+
+// SUBMIT DE FORMULARIO
 if (qrForm) {
     qrForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -232,9 +302,12 @@ if (qrForm) {
             const year = fecha.getFullYear().toString();
             const month = (fecha.getMonth() + 1).toString().padStart(2, '0');
 
+            // Guardamos las imágenes y PDFs en Base64
+            const payloadImagenes = loadedFilesData.map(item => item.data);
+
             const { data, error } = await supabase
                 .from('foto_qr_lr')
-                .insert([{ titulo, contenido, imagenes: selectedImagesBase64, year, month }])
+                .insert([{ titulo, contenido, imagenes: payloadImagenes, year, month }])
                 .select();
 
             if (error) throw error;
@@ -249,9 +322,7 @@ if (qrForm) {
             qrActions.classList.remove('hidden');
             qrForm.reset();
             previewGallery.classList.add('hidden');
-            selectedImagesBase64 = [];
-            if (imagenesInput) imagenesInput.value = '';
-            thumbnailsContainer.innerHTML = '';
+            loadedFilesData = [];
             await cargarHistorialPorFechas();
         } catch (err) {
             statusMsg.textContent = "Error: " + err.message;
@@ -264,6 +335,7 @@ if (btnCopy) btnCopy.addEventListener('click', () => {
     if (ultimoContenidoQR) navigator.clipboard.writeText(ultimoContenidoQR).then(() => alert("¡Enlace copiado!"));
 });
 
+// HISTORIAL Y ELIMINACIÓN DE PACIENTES
 async function cargarHistorialPorFechas() {
     try {
         const { data } = await supabase.from('foto_qr_lr').select('*').order('created_at', { ascending: false });
@@ -296,17 +368,32 @@ async function cargarHistorialPorFechas() {
                 rList.classList.add('record-list');
 
                 estructura[y][m].forEach(reg => {
-                    const item = document.createElement('div');
-                    item.classList.add('record-item');
-                    item.textContent = reg.titulo;
-                    item.addEventListener('click', () => {
+                    const row = document.createElement('div');
+                    row.classList.add('record-item-row');
+
+                    const title = document.createElement('div');
+                    title.classList.add('record-item-title');
+                    title.textContent = reg.titulo;
+                    title.addEventListener('click', () => {
                         abrirVisorCarrusel(reg);
                         if (window.innerWidth <= 768) {
                             sidebar.classList.add('collapsed');
                             mainContent.classList.add('expanded');
                         }
                     });
-                    rList.appendChild(item);
+
+                    const btnDelete = document.createElement('button');
+                    btnDelete.classList.add('btn-delete-record');
+                    btnDelete.innerHTML = '🗑️';
+                    btnDelete.title = 'Eliminar Paciente';
+                    btnDelete.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        eliminarPaciente(reg.id, reg.titulo);
+                    });
+
+                    row.appendChild(title);
+                    row.appendChild(btnDelete);
+                    rList.appendChild(row);
                 });
                 mDiv.appendChild(rList);
                 mList.appendChild(mDiv);
@@ -319,110 +406,92 @@ async function cargarHistorialPorFechas() {
     }
 }
 
-function normalizarAdjuntos(reg) {
-    const elementos = Array.isArray(reg.imagenes) ? reg.imagenes : [];
-    // Compatibilidad con registros antiguos, que guardaban cada imagen como una cadena.
-    return elementos.map((item, index) => {
-        if (typeof item === 'string') {
-            return { tipo: 'imagen', nombre: `${reg.titulo || 'imagen'}_${index + 1}.jpg`, data: item };
+async function eliminarPaciente(id, titulo) {
+    if (confirm(`¿Estás seguro de que deseas eliminar el registro de "${titulo}"?`)) {
+        try {
+            const { error } = await supabase
+                .from('foto_qr_lr')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            alert("Registro eliminado con éxito.");
+            await cargarHistorialPorFechas();
+        } catch (err) {
+            alert("Error al eliminar el registro: " + err.message);
         }
-        return {
-            tipo: item.tipo || (item.data && item.data.startsWith('data:application/pdf') ? 'pdf' : 'imagen'),
-            nombre: item.nombre || `${reg.titulo || 'archivo'}_${index + 1}`,
-            data: item.data || ''
-        };
-    }).filter(item => item.data);
+    }
 }
 
+// VISOR CARRUSEL CON SOPORTE PARA FOTOS Y PDF
 function abrirVisorCarrusel(reg) {
-    if (viewerTitle) viewerTitle.textContent = reg.titulo || 'Registro';
-    if (viewerContent) viewerContent.textContent = reg.contenido || '';
+    if (viewerTitle) viewerTitle.textContent = reg.titulo;
+    if (viewerContent) viewerContent.textContent = reg.contenido || "";
     viewerImages.innerHTML = '';
 
-    currentImagesArray = normalizarAdjuntos(reg);
-    currentIndex = 0;
-
-    if (!currentImagesArray.length) {
-        viewerImages.innerHTML = '<p style="color:white; text-align:center; padding:30px;">Este registro no tiene imágenes ni archivos PDF.</p>';
+    if (reg.imagenes && reg.imagenes.length > 0) {
+        currentImagesArray = reg.imagenes;
+        currentIndex = 0;
+        renderElementoCarrusel(reg.titulo);
     } else {
-        mostrarAdjuntoActual(reg.titulo || 'archivo');
+        viewerImages.innerHTML = '<p style="color:white; text-align:center; padding:30px;">Este registro no tiene archivos adjuntos.</p>';
     }
 
     viewerModal.classList.remove('hidden');
 }
 
-function mostrarAdjuntoActual(tituloReg = 'archivo') {
-    const item = currentImagesArray[currentIndex];
-    if (!item) return;
-
+function renderElementoCarrusel(tituloReg) {
     viewerImages.innerHTML = '';
-    const container = document.createElement('div');
-    container.className = 'carousel-container';
-    container.style.position = 'relative';
+    const fileData = currentImagesArray[currentIndex];
+    const carContainer = document.createElement('div');
+    carContainer.classList.add('carousel-container');
 
-    if (item.tipo === 'pdf') {
-        const pdfViewer = document.createElement('iframe');
-        pdfViewer.src = item.data;
-        pdfViewer.title = item.nombre;
-        pdfViewer.style.cssText = 'width:100%; height:70vh; min-height:400px; border:0; background:#fff; border-radius:8px;';
-        container.appendChild(pdfViewer);
+    const isPdf = fileData.startsWith('data:application/pdf');
+
+    if (isPdf) {
+        const iframe = document.createElement('iframe');
+        iframe.src = fileData;
+        carContainer.appendChild(iframe);
     } else {
-        const img = document.createElement('img');
-        img.src = item.data;
-        img.id = 'carouselActiveImg';
-        img.alt = item.nombre;
-        img.style.maxWidth = '100%';
-        img.style.maxHeight = '70vh';
-        img.style.objectFit = 'contain';
-        container.appendChild(img);
+        const imgTag = document.createElement('img');
+        imgTag.src = fileData;
+        carContainer.appendChild(imgTag);
     }
 
     const counter = document.createElement('div');
-    counter.className = 'carousel-counter';
-    counter.id = 'carouselCounter';
+    counter.classList.add('carousel-counter');
     counter.textContent = `${currentIndex + 1} / ${currentImagesArray.length}`;
-    container.appendChild(counter);
+    carContainer.appendChild(counter);
 
-    const download = document.createElement('a');
-    download.id = 'carouselDownloadBtn';
-    download.className = 'carousel-download-btn';
-    download.textContent = '⬇️ Descargar';
-    download.href = item.data;
-    download.download = item.nombre || `${tituloReg.replace(/\s+/g, '_')}_${currentIndex + 1}`;
-    download.target = '_blank';
-    download.rel = 'noopener';
-    container.appendChild(download);
-
-    const filename = document.createElement('p');
-    filename.textContent = item.nombre;
-    filename.style.cssText = 'color:white; text-align:center; overflow-wrap:anywhere; padding:8px;';
-    container.appendChild(filename);
+    const btnDownload = document.createElement('a');
+    btnDownload.classList.add('carousel-download-btn');
+    btnDownload.innerHTML = '⬇️ Descargar';
+    btnDownload.href = fileData;
+    btnDownload.download = `${tituloReg.replace(/\s+/g, '_')}_${currentIndex + 1}.${isPdf ? 'pdf' : 'jpg'}`;
+    carContainer.appendChild(btnDownload);
 
     if (currentImagesArray.length > 1) {
-        const prev = document.createElement('button');
-        prev.className = 'carousel-btn carousel-prev';
-        prev.innerHTML = '&#10094;';
-        prev.type = 'button';
-        prev.setAttribute('aria-label', 'Archivo anterior');
-        prev.addEventListener('click', () => cambiarFotoCarrusel(-1, tituloReg));
+        const btnPrev = document.createElement('button');
+        btnPrev.classList.add('carousel-btn', 'carousel-prev');
+        btnPrev.innerHTML = '&#10094;';
+        btnPrev.addEventListener('click', () => {
+            currentIndex = (currentIndex - 1 + currentImagesArray.length) % currentImagesArray.length;
+            renderElementoCarrusel(tituloReg);
+        });
 
-        const next = document.createElement('button');
-        next.className = 'carousel-btn carousel-next';
-        next.innerHTML = '&#10095;';
-        next.type = 'button';
-        next.setAttribute('aria-label', 'Archivo siguiente');
-        next.addEventListener('click', () => cambiarFotoCarrusel(1, tituloReg));
+        const btnNext = document.createElement('button');
+        btnNext.classList.add('carousel-btn', 'carousel-next');
+        btnNext.innerHTML = '&#10095;';
+        btnNext.addEventListener('click', () => {
+            currentIndex = (currentIndex + 1) % currentImagesArray.length;
+            renderElementoCarrusel(tituloReg);
+        });
 
-        container.append(prev, next);
+        carContainer.appendChild(btnPrev);
+        carContainer.appendChild(btnNext);
     }
 
-    viewerImages.appendChild(container);
-}
-
-function cambiarFotoCarrusel(direccion, tituloReg = 'archivo') {
-    if (!currentImagesArray.length) return;
-    currentIndex = (currentIndex + direccion + currentImagesArray.length) % currentImagesArray.length;
-    mostrarAdjuntoActual(tituloReg);
+    viewerImages.appendChild(carContainer);
 }
 
 if (btnCloseViewer) {
