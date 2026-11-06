@@ -1,7 +1,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 const SUPABASE_URL = 'https://xdbquvontcxjymxharmr.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYnF1dm9udGN4anlteGhhcm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNzYwNjMsImV4cCI6MjEwNjk1MjA2M30.YSQmfv6LFulZa9RIP7VnfL4UZXYobhsEUKOKGOI9Ilk';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkYnF1dm9udCXjymxharmrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNzYwNjMsImV4cCI6MjEwNjk1MjA2M30.YSQmfv6LFulZa9RIP7VnfL4UZXYobhsEUKOKGOI9Ilk';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
@@ -35,7 +35,6 @@ const viewerTitle = document.getElementById('viewerTitle');
 const viewerContent = document.getElementById('viewerContent');
 const viewerImages = document.getElementById('viewerImages');
 
-// Editor CamScanner variables
 const editorModal = document.getElementById('editorModal');
 const btnCloseEditor = document.getElementById('btnCloseEditor');
 const editorCanvas = document.getElementById('editorCanvas');
@@ -134,7 +133,6 @@ if (btnLogout) {
     });
 }
 
-// Cargar Archivos (Fotos y PDFs)
 if (archivosInput) {
     archivosInput.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
@@ -195,7 +193,6 @@ function renderThumbnails() {
     });
 }
 
-// --- EDITOR CAMSCANNER ---
 function abrirEditorCamScanner(index) {
     currentEditingIndex = index;
     currentRotation = 0;
@@ -237,11 +234,7 @@ function aplicarFiltrosYCargarCanvas() {
     const contrast = contrastInput.value;
     ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
 
-    ctx.drawImage(
-        currentImageObject,
-        -width / 2,
-        -height / 2
-    );
+    ctx.drawImage(currentImageObject, -width / 2, -height / 2);
     ctx.restore();
 
     if (isBw) {
@@ -284,7 +277,6 @@ if (btnCloseEditor) {
     btnCloseEditor.addEventListener('click', () => editorModal.classList.add('hidden'));
 }
 
-// SUBMIT DE FORMULARIO
 if (qrForm) {
     qrForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -298,7 +290,6 @@ if (qrForm) {
             const fecha = new Date();
             const year = fecha.getFullYear().toString();
             const month = (fecha.getMonth() + 1).toString().padStart(2, '0');
-
             const payloadImagenes = loadedFilesData.map(item => item.data);
 
             const { data, error } = await supabase
@@ -331,20 +322,16 @@ if (btnCopy) btnCopy.addEventListener('click', () => {
     if (ultimoContenidoQR) navigator.clipboard.writeText(ultimoContenidoQR).then(() => alert("¡Enlace copiado!"));
 });
 
-// HISTORIAL Y ELIMINACIÓN DE PACIENTES
 async function cargarHistorialPorFechas() {
     try {
         treeMenu.innerHTML = '<p style="font-size:0.8rem; color:#64748b; text-align:center; margin-top:15px;">Cargando...</p>';
         
+        // Consulta simplificada para evitar errores de columnas faltantes
         const { data, error } = await supabase
             .from('foto_qr_lr')
-            .select('*')
-            .order('created_at', { ascending: false });
+            .select('id, titulo, contenido, imagenes, year, month, created_at');
 
-        if (error) {
-            console.error("Supabase Error:", error);
-            throw error;
-        }
+        if (error) throw error;
 
         treeMenu.innerHTML = '';
         if (!data || data.length === 0) {
@@ -354,10 +341,10 @@ async function cargarHistorialPorFechas() {
 
         const estructura = {};
         data.forEach(reg => {
-            let y = reg.year;
-            let m = reg.month;
-            if (!y || !m) {
-                const d = reg.created_at ? new Date(reg.created_at) : new Date();
+            let y = reg.year || '2026';
+            let m = reg.month || '10';
+            if (reg.created_at && (!reg.year || !reg.month)) {
+                const d = new Date(reg.created_at);
                 y = d.getFullYear().toString();
                 m = (d.getMonth() + 1).toString().padStart(2, '0');
             }
@@ -386,7 +373,7 @@ async function cargarHistorialPorFechas() {
 
                     const title = document.createElement('div');
                     title.classList.add('record-item-title');
-                    title.textContent = reg.titulo;
+                    title.textContent = reg.titulo || 'Sin nombre';
                     title.addEventListener('click', () => {
                         abrirVisorCarrusel(reg);
                         if (window.innerWidth <= 768) {
@@ -416,12 +403,12 @@ async function cargarHistorialPorFechas() {
         }
     } catch (err) {
         console.error("Error al cargar historial:", err);
-        treeMenu.innerHTML = `<p style="font-size:0.8rem; color:red; text-align:center; margin-top:15px; padding:0 10px;">Error al cargar: ${err.message}</p>`;
+        treeMenu.innerHTML = `<p style="font-size:0.75rem; color:red; text-align:center; margin-top:15px; padding:0 5px;">Error: ${err.message}</p>`;
     }
 }
 
 async function eliminarPaciente(id, titulo) {
-    if (confirm(`¿Estás seguro de que deseas eliminar el registro de "${titulo}"?`)) {
+    if (confirm(`¿Estás seguro de que deseas eliminar el registro de "${titulo || 'este paciente'}"?`)) {
         try {
             const { error } = await supabase
                 .from('foto_qr_lr')
@@ -437,7 +424,6 @@ async function eliminarPaciente(id, titulo) {
     }
 }
 
-// VISOR CARRUSEL CON SOPORTE PARA FOTOS Y PDF
 function abrirVisorCarrusel(reg) {
     if (viewerTitle) viewerTitle.textContent = reg.titulo;
     if (viewerContent) viewerContent.textContent = reg.contenido || "";
@@ -481,7 +467,7 @@ function renderElementoCarrusel(tituloReg) {
     btnDownload.classList.add('carousel-download-btn');
     btnDownload.innerHTML = '⬇️ Descargar';
     btnDownload.href = fileData;
-    btnDownload.download = `${tituloReg.replace(/\s+/g, '_')}_${currentIndex + 1}.${isPdf ? 'pdf' : 'jpg'}`;
+    btnDownload.download = `${(tituloReg || 'paciente').replace(/\s+/g, '_')}_${currentIndex + 1}.${isPdf ? 'pdf' : 'jpg'}`;
     carContainer.appendChild(btnDownload);
 
     if (currentImagesArray.length > 1) {
