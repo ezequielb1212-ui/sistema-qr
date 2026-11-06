@@ -334,13 +334,17 @@ if (btnCopy) btnCopy.addEventListener('click', () => {
 // HISTORIAL Y ELIMINACIÓN DE PACIENTES
 async function cargarHistorialPorFechas() {
     try {
-        console.log("Cargando historial desde Supabase...");
+        treeMenu.innerHTML = '<p style="font-size:0.8rem; color:#64748b; text-align:center; margin-top:15px;">Cargando...</p>';
+        
         const { data, error } = await supabase
             .from('foto_qr_lr')
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error("Supabase Error:", error);
+            throw error;
+        }
 
         treeMenu.innerHTML = '';
         if (!data || data.length === 0) {
@@ -350,7 +354,6 @@ async function cargarHistorialPorFechas() {
 
         const estructura = {};
         data.forEach(reg => {
-            // Si no tiene año o mes guardado, lo extraemos de created_at o usamos la fecha actual
             let y = reg.year;
             let m = reg.month;
             if (!y || !m) {
@@ -413,7 +416,7 @@ async function cargarHistorialPorFechas() {
         }
     } catch (err) {
         console.error("Error al cargar historial:", err);
-        treeMenu.innerHTML = `<p style="font-size:0.8rem; color:red; text-align:center; margin-top:15px;">Error al cargar historial.</p>`;
+        treeMenu.innerHTML = `<p style="font-size:0.8rem; color:red; text-align:center; margin-top:15px; padding:0 10px;">Error al cargar: ${err.message}</p>`;
     }
 }
 
@@ -457,7 +460,7 @@ function renderElementoCarrusel(tituloReg) {
     const carContainer = document.createElement('div');
     carContainer.classList.add('carousel-container');
 
-    const isPdf = fileData.startsWith('data:application/pdf');
+    const isPdf = typeof fileData === 'string' && fileData.startsWith('data:application/pdf');
 
     if (isPdf) {
         const iframe = document.createElement('iframe');
